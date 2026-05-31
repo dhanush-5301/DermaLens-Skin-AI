@@ -688,3 +688,5 @@ If you found this project helpful, please consider:
 [GitHub](https://github.com/YOUR_USERNAME/dermalens-ai) • [Issues](https://github.com/YOUR_USERNAME/dermalens-ai/issues) • [Discussions](https://github.com/YOUR_USERNAME/dermalens-ai/discussions)
 
 </div>
+#   A I - - P O W E R E D - S K I N - L E S I O N - A N A L Y S I S - P L A T F O R M  
+ 
