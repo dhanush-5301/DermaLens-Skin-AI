@@ -15,7 +15,26 @@ A full-stack, production-ready dermoscopic analysis system combining a fine-tune
 
 **⚠️ For educational and research purposes only — not a medical device.**
 
+[![GitHub Stars](https://img.shields.io/github/stars/YOUR_USERNAME/dermalens-ai?style=social)](https://github.com/YOUR_USERNAME/dermalens-ai)
+[![Fork](https://img.shields.io/github/forks/YOUR_USERNAME/dermalens-ai?style=social)](https://github.com/YOUR_USERNAME/dermalens-ai/fork)
+
 </div>
+
+---
+
+## 📑 Table of Contents
+
+- [Features](#-features)
+- [Quick Start](#-quick-start)
+- [Architecture](#-system-architecture)
+- [Project Structure](#-project-structure)
+- [Installation & Usage](#-installation--usage)
+- [API Reference](#-api-reference)
+- [Model Training](#-model-training)
+- [Future Improvements](#-future-improvements)
+- [Contributing](#-contributing)
+- [License](#-license)
+- [Disclaimer](#%EF%B8%8F-disclaimer)
 
 ---
 
@@ -303,7 +322,269 @@ Base URL: `http://localhost:8000`
 
 ---
 
-## ⚠️ Disclaimer
+## 🎯 Usage Examples
+
+### 1. Drag & Drop Analysis
+1. Upload a dermoscopic image via the web interface
+2. Enter optional patient information (age, location, symptoms)
+3. Click **Analyze** and wait for results (5-10 seconds)
+4. View detailed clinical report with:
+   - Primary diagnosis with confidence score
+   - ABCD criteria analysis
+   - ICD-10 codes and risk assessment
+   - Differential diagnoses
+   - Clinical recommendations
+
+### 2. Programmatic API Usage
+
+```python
+import requests
+
+# Prepare image and metadata
+with open("lesion.jpg", "rb") as f:
+    files = {"file": f}
+    data = {
+        "patient_name": "John Doe",
+        "age": "45",
+        "sex": "M",
+        "location": "left shoulder",
+        "symptoms": "itching, gradual growth",
+    }
+    
+    response = requests.post(
+        "http://localhost:8000/api/analyze",
+        files=files,
+        data=data
+    )
+    
+    report = response.json()
+    print(report["clinical_report"])
+```
+
+### 3. Batch Processing
+
+```bash
+# Analyze all images in a folder
+for image in uploads/*.jpg; do
+    python diagnose.py --image "$image" --output results/
+done
+```
+
+---
+
+## 🚀 Installation & Usage
+
+### Prerequisites
+- **Python 3.11+**
+- **Anthropic API key** → [Get it here](https://console.anthropic.com/keys)
+- **GPU (NVIDIA/CUDA)** — Optional, but recommended for training
+
+### Step 1: Clone Repository
+
+```bash
+git clone https://github.com/YOUR_USERNAME/dermalens-ai.git
+cd dermalens-ai
+```
+
+### Step 2: Create Virtual Environment
+
+**Windows:**
+```bash
+python -m venv venv
+venv\Scripts\activate
+```
+
+**macOS / Linux:**
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### Step 3: Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### Step 4: Configure API Key
+
+```bash
+# Copy example environment file
+copy .env.example .env        # Windows
+# cp .env.example .env        # macOS / Linux
+
+# Edit .env and add your Anthropic API key:
+# ANTHROPIC_API_KEY=sk-ant-...
+```
+
+### Step 5: Run Application
+
+**Option A — Local Development:**
+```bash
+uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+# Open: http://localhost:8000
+```
+
+**Option B — Docker Compose:**
+```bash
+docker-compose up --build
+# Open: http://localhost:8000
+```
+
+**Option C — Windows Batch File:**
+```bash
+RUN_DERMALENS.bat
+```
+
+---
+
+## 📊 Expected Output
+
+### Clinical Report Example
+
+```
+PATIENT INFORMATION
+─────────────────────────────────────────
+Name: John Doe
+Age: 45 years
+Location: Left shoulder
+Duration: 3 months, gradual growth
+Symptoms: Itching, occasional bleeding
+
+PRIMARY DIAGNOSIS
+─────────────────────────────────────────
+Classification: Melanoma (Malignant)
+Confidence: 87.3%
+ICD-10: C43.9
+
+ABCD CRITERIA ANALYSIS
+─────────────────────────────────────────
+Asymmetry: High (4/5)
+Border Irregularity: High (4/5)
+Color Variation: Present (brown, black)
+Diameter: 12mm (>6mm threshold)
+Overall Risk: HIGH - Recommend urgent referral
+
+DIFFERENTIAL DIAGNOSES
+─────────────────────────────────────────
+1. Melanoma (87.3%) - MOST LIKELY
+2. Dysplastic Nevus (9.5%)
+3. Seborrheic Keratosis (2.2%)
+
+CLINICAL RECOMMENDATIONS
+─────────────────────────────────────────
+⚠️ URGENT: Refer to dermatologist immediately
+- Consider dermoscopy by specialist
+- Possible biopsy recommended
+- Document images for follow-up
+
+SECONDARY CONDITIONS
+─────────────────────────────────────────
+Based on location and symptoms:
+- Solar Lentigines (photodamage): 40% probability
+- Actinic Keratosis: 15% probability
+```
+
+---
+
+## 🔬 Troubleshooting
+
+### Issue: ModuleNotFoundError: No module named 'torch'
+
+**Solution:**
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+```
+
+### Issue: Anthropic API key not working
+
+**Solution:**
+1. Verify `.env` file exists in project root
+2. Check that `ANTHROPIC_API_KEY=sk-ant-...` is set correctly
+3. Test key at [console.anthropic.com](https://console.anthropic.com)
+
+### Issue: "CUDA out of memory"
+
+**Solution:**
+```bash
+# Reduce batch size
+python train.py --data_dir data/HAM10000 --batch_size 16
+```
+
+### Issue: Port 8000 already in use
+
+**Solution:**
+```bash
+# Use different port
+uvicorn backend.main:app --port 8001
+```
+
+For more troubleshooting, see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+
+---
+
+## 🎓 Future Improvements
+
+- [ ] **Multi-modal Input** — Add text-based history + image analysis combination
+- [ ] **Mobile App** — React Native / Flutter app for iOS & Android
+- [ ] **Real-time Webcam** — Live lesion analysis directly from camera
+- [ ] **Patient Dashboard** — Track lesion history and follow-ups
+- [ ] **Model Updates** — Vision Transformers (ViT) baseline comparison
+- [ ] **Dataset Expansion** — Integrate additional dermoscopy datasets
+- [ ] **Offline Mode** — Quantized model for edge deployment
+- [ ] **Multi-language** — i18n support for global accessibility
+- [ ] **Audit Logging** — Compliance with HIPAA/GDPR requirements
+- [ ] **Explainability** — LIME/SHAP visualizations for model decisions
+- [ ] **Batch API** — Async queue for bulk analysis
+- [ ] **ML Monitoring** — Data drift detection and model retraining pipeline
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please follow these steps:
+
+1. **Fork** this repository
+2. **Create a feature branch**: `git checkout -b feature/your-feature-name`
+3. **Commit your changes**: `git commit -am 'Add your feature description'`
+4. **Push to branch**: `git push origin feature/your-feature-name`
+5. **Submit a Pull Request**
+
+### Contribution Guidelines
+
+- Follow PEP 8 style guidelines for Python code
+- Add docstrings to all functions
+- Include unit tests for new features
+- Update README.md if adding new functionality
+- Ensure all tests pass: `pytest`
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+---
+
+## 📝 Commit Message Standards
+
+Please use clear, semantic commit messages:
+
+❌ **Bad:**
+```
+update
+fix
+final
+```
+
+✅ **Good:**
+```
+Add user authentication endpoint
+Fix image preprocessing color space bug
+Improve model inference speed by 20%
+Refactor API error handling
+Update dataset documentation
+```
+
+---
+
+## 📄 Disclaimer
 
 **This system is strictly for educational and research purposes only.**
 
@@ -312,26 +593,98 @@ Base URL: `http://localhost:8000`
 - ❌ Do not make clinical decisions based solely on AI output
 - ✅ All findings must be confirmed by a licensed healthcare professional
 
+**Medical Disclaimer:** Always consult a qualified healthcare professional for any skin concerns. This software is provided "as-is" without any warranty of accuracy or fitness for medical use.
+
 ---
 
 ## 📜 License
 
-MIT — see [LICENSE](LICENSE) for details.
+This project is licensed under the **MIT License** — see [LICENSE](LICENSE) for full details.
 
-Dataset citation:
-> Tschandl P., Rosendahl C., Kittler H. *The HAM10000 dataset, a large collection of multi-source dermatoscopic images of common pigmented skin lesions.* Sci. Data 5, 180161 (2018). [DOI: 10.1038/sdata.2018.161](https://doi.org/10.1038/sdata.2018.161)
+You are free to:
+- ✅ Use this software commercially or privately
+- ✅ Modify and distribute the code
+- ✅ Include in proprietary applications
+
+With the condition:
+- ⚠️ Include the original license and copyright notice
+
+### Dataset Citation
+
+If you use the HAM10000 dataset in your research, please cite:
+
+```bibtex
+@article{tschandl2018ham10000,
+  title={The HAM10000 dataset, a large collection of multi-source dermatoscopic images of common pigmented skin lesions},
+  author={Tschandl, Philipp and Rosendahl, Cliff and Kittler, Harald},
+  journal={Scientific Data},
+  volume={5},
+  pages={180161},
+  year={2018},
+  doi={10.1038/sdata.2018.161}
+}
+```
+
+---
+
+## 👥 Author & Contributors
+
+**Created by:** Your Name / Your Organization
+
+**Major Contributors:**
+- Your Name — Core architecture & development
+- Contributor Name — Dataset & training pipeline
+- Contributor Name — Frontend UI/UX
+
+Interested in contributing? See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+---
+
+## 📞 Support & Contact
+
+- **Issues & Bug Reports:** [GitHub Issues](https://github.com/YOUR_USERNAME/dermalens-ai/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/YOUR_USERNAME/dermalens-ai/discussions)
+- **Email:** your-email@example.com
 
 ---
 
 ## 🙏 Acknowledgements
 
+This project was made possible by:
+
 - **HAM10000 Dataset** — Tschandl et al. (2018), Harvard Dataverse / ISIC Archive
 - **MobileNetV2** — Sandler et al. (2018), Google Research
-- **Anthropic Claude** — Clinical language model capabilities
-- **FastAPI** — High-performance Python async web framework
+- **Anthropic Claude** — Advanced clinical language model capabilities
+- **FastAPI** — Modern, high-performance Python async web framework
+- **PyTorch** — Flexible deep learning framework
+- **Open Source Community** — Countless libraries and tools
+
+---
+
+## 📊 Project Statistics
+
+- **Lines of Code:** ~2000+
+- **Python Modules:** 10+
+- **API Endpoints:** 7
+- **Supported Classes:** 7 (HAM10000)
+- **Knowledge Base:** 25+ conditions
+- **Training Dataset:** 10,015 images
+- **Model Size:** ~13MB
 
 ---
 
 <div align="center">
+
+**[⬆ back to top](#dermalens-ai-)**
+
 Made with ❤️ for the open-source dermatology AI community
+
+If you found this project helpful, please consider:
+- ⭐ Starring this repository
+- 🔗 Sharing with colleagues
+- 🐛 Reporting bugs
+- 💡 Suggesting improvements
+
+[GitHub](https://github.com/YOUR_USERNAME/dermalens-ai) • [Issues](https://github.com/YOUR_USERNAME/dermalens-ai/issues) • [Discussions](https://github.com/YOUR_USERNAME/dermalens-ai/discussions)
+
 </div>
