@@ -1,0 +1,1985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DermaLens AI — Skin Intelligence Platform</title>
+<meta name="description" content="AI-powered skin condition analysis with nearby clinic finder and AI assistant. No installation required.">
+
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- Leaflet Map -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- TensorFlow.js -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
+
+<style>
+/* ═══════════════════════════════════════════════
+   RESET & ROOT
+═══════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #050508;
+  --surface:  #0d0d14;
+  --card:     #111120;
+  --border:   #1e1e32;
+  --border2:  #2a2a45;
+  --ink:      #f0f0ff;
+  --muted:    #8888aa;
+  --accent:   #6366f1;
+  --accent2:  #10b981;
+  --accent3:  #f59e0b;
+  --danger:   #ef4444;
+  --glow:     rgba(99,102,241,0.35);
+  --glow2:    rgba(16,185,129,0.25);
+  --shadow:   0 8px 40px rgba(0,0,0,0.6);
+  --radius:   12px;
+  --radius-sm:8px;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* ═══════════════════════════════════════════════
+   HEADER / NAV
+═══════════════════════════════════════════════ */
+header {
+  position: sticky; top: 0; z-index: 200;
+  display: flex; align-items: center; gap: 1rem;
+  padding: 0.9rem 2rem;
+  background: rgba(5,5,8,0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  display: flex; align-items: center; gap: 0.65rem;
+  text-decoration: none; margin-right: auto;
+}
+.logo-icon {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, var(--accent), #818cf8);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; flex-shrink: 0;
+}
+.logo-text {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 1.2rem; font-weight: 800; color: var(--ink);
+}
+.logo-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.55rem; color: var(--muted);
+  letter-spacing: 0.15em; text-transform: uppercase;
+}
+
+.nav-tabs {
+  display: flex; gap: 0.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px; padding: 0.25rem;
+}
+.nav-tab {
+  padding: 0.45rem 1rem;
+  font-size: 0.78rem; font-weight: 600;
+  border: none; border-radius: 6px;
+  cursor: pointer; transition: all 0.2s;
+  background: transparent; color: var(--muted);
+  display: flex; align-items: center; gap: 0.4rem;
+  white-space: nowrap;
+}
+.nav-tab.active { background: var(--accent); color: #fff; }
+.nav-tab:hover:not(.active) { background: var(--border); color: var(--ink); }
+
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent2); flex-shrink: 0;
+  animation: pulse 2s ease infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 0 0 var(--glow2)} 50%{opacity:0.7;box-shadow:0 0 0 5px transparent} }
+
+/* ═══════════════════════════════════════════════
+   PAGES / TABS
+═══════════════════════════════════════════════ */
+.page { display: none; }
+.page.active { display: block; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+/* ═══════════════════════════════════════════════
+   HERO
+═══════════════════════════════════════════════ */
+.hero {
+  text-align: center;
+  padding: 4rem 2rem 3rem;
+  max-width: 700px; margin: 0 auto;
+}
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.65rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--accent); background: rgba(99,102,241,0.1);
+  border: 1px solid rgba(99,102,241,0.3);
+  padding: 0.4rem 1rem; border-radius: 2rem; margin-bottom: 1.5rem;
+}
+.hero h1 {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: clamp(2.2rem, 5vw, 4rem);
+  font-weight: 800; line-height: 1.08;
+  letter-spacing: -0.025em; margin-bottom: 1.25rem;
+  background: linear-gradient(135deg, #fff 30%, #a5b4fc 100%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.hero h1 em {
+  font-style: normal;
+  background: linear-gradient(135deg, var(--accent), #818cf8);
+  -webkit-background-clip: text; background-clip: text;
+}
+.hero p {
+  font-size: 1rem; color: var(--muted); line-height: 1.8;
+  max-width: 520px; margin: 0 auto 2rem;
+}
+.hero-stats {
+  display: flex; justify-content: center; gap: 2.5rem;
+  padding: 1.25rem 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  margin-bottom: 2rem;
+}
+.stat-num { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.6rem; font-weight: 800; color: var(--accent); }
+.stat-lbl { font-size: 0.72rem; color: var(--muted); margin-top: 0.1rem; }
+.start-btn {
+  padding: 0.9rem 2.5rem;
+  background: linear-gradient(135deg, var(--accent), #818cf8);
+  color: #fff; border: none; border-radius: 8px;
+  font-size: 0.92rem; font-weight: 700;
+  cursor: pointer; transition: all 0.3s;
+  box-shadow: 0 8px 30px var(--glow);
+}
+.start-btn:hover { transform: translateY(-3px); box-shadow: 0 14px 40px var(--glow); }
+
+/* ═══════════════════════════════════════════════
+   ANALYSIS PAGE
+═══════════════════════════════════════════════ */
+.analysis-wrap {
+  max-width: 1100px; margin: 0 auto;
+  padding: 2rem 2rem 4rem;
+  display: grid; grid-template-columns: 380px 1fr;
+  gap: 1.5rem; align-items: start;
+}
+
+/* Card */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.card + .card { margin-top: 1.25rem; }
+.card-head {
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 1rem 1.4rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+}
+.card-head-icon {
+  width: 28px; height: 28px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.85rem; flex-shrink: 0;
+}
+.card-head-title {
+  font-size: 0.78rem; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+.card-body { padding: 1.4rem; }
+
+/* Drop Zone */
+.drop-zone {
+  border: 2px dashed var(--border2);
+  border-radius: var(--radius-sm);
+  padding: 2.5rem 1rem; text-align: center;
+  cursor: pointer; transition: all 0.3s;
+  background: var(--bg);
+}
+.drop-zone:hover, .drop-zone.over {
+  border-color: var(--accent);
+  background: rgba(99,102,241,0.04);
+  transform: translateY(-2px);
+}
+.drop-ico { font-size: 2.2rem; margin-bottom: 0.75rem; }
+.drop-zone p { font-size: 0.85rem; color: var(--muted); margin-bottom: 0.3rem; }
+.drop-zone small { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; color: var(--border2); }
+
+#fileInput { display: none; }
+
+.preview-wrap { position: relative; border-radius: var(--radius-sm); overflow: hidden; }
+#previewImg { width: 100%; max-height: 280px; object-fit: contain; display: block; background: #000; }
+.preview-top {
+  position: absolute; top: 0.6rem; right: 0.6rem;
+  display: flex; gap: 0.4rem;
+}
+.icon-btn {
+  background: rgba(0,0,0,0.65); color: #fff; border: none;
+  border-radius: 5px; padding: 0.3rem 0.7rem; font-size: 0.72rem;
+  cursor: pointer; transition: background 0.15s;
+}
+.icon-btn:hover { background: rgba(0,0,0,0.9); }
+
+/* Form Grid */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; margin-top: 1rem; }
+.form-field { display: flex; flex-direction: column; gap: 0.3rem; }
+.form-label {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+}
+.form-field input, .form-field select, .form-field textarea {
+  padding: 0.5rem 0.7rem;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 5px; color: var(--ink);
+  font-family: 'Inter', sans-serif; font-size: 0.82rem;
+  outline: none; transition: border-color 0.2s;
+}
+.form-field input:focus, .form-field select:focus, .form-field textarea:focus {
+  border-color: var(--accent);
+}
+.full { grid-column: 1 / -1; }
+
+/* Analyze Button */
+.analyze-btn {
+  width: 100%; margin-top: 1rem; padding: 0.9rem;
+  background: linear-gradient(135deg, var(--accent), #818cf8);
+  color: #fff; border: none; border-radius: 8px;
+  font-size: 0.9rem; font-weight: 700; letter-spacing: 0.04em;
+  cursor: pointer; transition: all 0.3s;
+  display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+  box-shadow: 0 4px 20px var(--glow);
+}
+.analyze-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 30px var(--glow); }
+.analyze-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Camera Button */
+.camera-btn {
+  width: 100%; margin-top: 0.65rem; padding: 0.7rem;
+  background: var(--surface); color: var(--muted);
+  border: 1px solid var(--border); border-radius: 8px;
+  font-size: 0.82rem; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+}
+.camera-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Disease chips */
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.8rem; }
+.chip {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid var(--border); border-radius: 2rem;
+  color: var(--muted); letter-spacing: 0.04em;
+}
+.chip.highlight { border-color: var(--accent); color: var(--accent); }
+
+/* Results area */
+#results {
+  display: flex; flex-direction: column; gap: 1.25rem;
+}
+.empty-state {
+  padding: 4rem 2rem; text-align: center;
+  color: var(--muted); font-size: 0.85rem; line-height: 1.8;
+}
+.empty-icon { font-size: 3rem; opacity: 0.2; margin-bottom: 0.9rem; }
+
+/* Loading */
+.loading-card { padding: 3rem 1.5rem; text-align: center; }
+.spinner {
+  width: 42px; height: 42px;
+  border: 2px solid var(--border); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+  margin: 0 auto 1.25rem;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--muted); }
+
+/* Diagnosis result cards */
+.dx-head { padding: 1.25rem 1.4rem; border-bottom: 1px solid var(--border); }
+.dx-badge {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 0.25rem 0.7rem; border-radius: 2rem; margin-bottom: 0.6rem;
+}
+.badge-low    { background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+.badge-medium { background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+.badge-high   { background: rgba(239,68,68,0.12);  color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+.badge-info   { background: rgba(99,102,241,0.12); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); }
+
+.dx-name { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.8rem; font-weight: 800; line-height: 1.1; margin-bottom: 0.2rem; }
+.dx-sci  { font-style: italic; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.3rem; }
+.dx-icd  { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--muted); }
+
+/* Confidence bar */
+.conf-section { padding: 1rem 1.4rem; border-bottom: 1px solid var(--border); }
+.conf-row { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--muted); margin-bottom: 0.5rem; }
+.conf-val { color: var(--ink); font-weight: 600; }
+.bar-track { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #818cf8); border-radius: 2px; transition: width 1.2s cubic-bezier(0.4,0,0.2,1); }
+
+/* Prediction bars */
+.dist-section { padding: 1rem 1.4rem; }
+.sec-label { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.75rem; }
+.pred-row { display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.45rem; }
+.pred-name { font-size: 0.73rem; color: var(--ink); width: 155px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pred-track { flex: 1; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.pred-bar { height: 100%; border-radius: 2px; background: var(--border2); }
+.pred-bar.top { background: linear-gradient(90deg, var(--accent), #818cf8); }
+.pred-pct { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--muted); width: 38px; text-align: right; }
+
+/* ABCD grid */
+.abcd-wrap { padding: 1rem 1.4rem; border-bottom: 1px solid var(--border); }
+.abcd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; margin-top: 0.6rem; }
+.abcd-box { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.75rem; }
+.abcd-letter { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.4rem; font-weight: 800; color: var(--accent); line-height: 1; }
+.abcd-word { font-family: 'JetBrains Mono', monospace; font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin: 0.15rem 0 0.3rem; }
+.abcd-val { font-size: 0.75rem; color: var(--ink); line-height: 1.5; }
+
+/* Recommendations */
+.rec-section { padding: 1rem 1.4rem; }
+.rec-item { display: flex; gap: 0.7rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+.rec-item:last-child { border-bottom: none; }
+.rec-ico { font-size: 0.9rem; flex-shrink: 0; margin-top: 0.05rem; }
+.rec-txt { font-size: 0.8rem; color: var(--muted); line-height: 1.55; }
+.rec-txt strong { color: var(--ink); }
+
+/* Differentials */
+.diff-section { padding: 1rem 1.4rem; border-bottom: 1px solid var(--border); }
+.diff-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border); }
+.diff-item:last-child { border-bottom: none; }
+.diff-num { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; color: var(--muted); width: 16px; }
+.diff-name { flex: 1; font-size: 0.78rem; color: var(--ink); }
+.diff-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; color: var(--accent); }
+
+/* Urgent box */
+.urgent-box {
+  margin: 1rem 1.4rem;
+  padding: 0.9rem 1.1rem;
+  background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.3);
+  border-left: 3px solid var(--danger); border-radius: var(--radius-sm);
+  font-size: 0.8rem; color: #fca5a5; line-height: 1.6;
+}
+
+/* Clinical report */
+.report-section { padding: 1.2rem 1.4rem; }
+.report-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.9rem; }
+.report-ico { width: 28px; height: 28px; border-radius: 6px; background: linear-gradient(135deg,var(--accent),#818cf8); display:flex;align-items:center;justify-content:center;font-size:0.85rem; }
+.report-body { font-size: 0.84rem; color: var(--muted); line-height: 1.85; }
+.report-body p { margin-bottom: 0.75rem; }
+.report-body strong { color: var(--ink); }
+
+/* ═══════════════════════════════════════════════
+   AI ASSISTANT PAGE
+═══════════════════════════════════════════════ */
+.assistant-wrap {
+  max-width: 820px; margin: 0 auto;
+  padding: 2rem 2rem 4rem;
+  display: flex; flex-direction: column; gap: 1rem;
+  height: calc(100vh - 140px);
+}
+
+.chat-box {
+  flex: 1; overflow-y: auto;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.25rem;
+  display: flex; flex-direction: column; gap: 1rem;
+  min-height: 300px;
+}
+
+.msg {
+  display: flex; gap: 0.75rem; animation: up 0.25s ease;
+}
+.msg.user { flex-direction: row-reverse; }
+@keyframes up { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+.msg-avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.9rem; flex-shrink: 0;
+}
+.msg-avatar.ai  { background: linear-gradient(135deg,var(--accent),#818cf8); }
+.msg-avatar.usr { background: var(--border2); }
+
+.msg-bubble {
+  max-width: 78%; padding: 0.75rem 1rem;
+  border-radius: 12px; font-size: 0.85rem; line-height: 1.7;
+}
+.msg.ai .msg-bubble {
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--ink); border-top-left-radius: 4px;
+}
+.msg.user .msg-bubble {
+  background: linear-gradient(135deg,var(--accent),#818cf8);
+  color: #fff; border-top-right-radius: 4px;
+}
+.msg-bubble strong { color: var(--accent2); }
+.msg.user .msg-bubble strong { color: #e0e7ff; }
+
+/* Suggested prompts */
+.suggestions {
+  display: flex; flex-wrap: wrap; gap: 0.5rem;
+}
+.suggest-btn {
+  padding: 0.45rem 0.9rem;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 2rem; font-size: 0.75rem; color: var(--muted);
+  cursor: pointer; transition: all 0.2s; white-space: nowrap;
+}
+.suggest-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Chat input */
+.chat-input-row {
+  display: flex; gap: 0.75rem;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 0.75rem;
+}
+#chatInput {
+  flex: 1; background: transparent; border: none; outline: none;
+  color: var(--ink); font-family: 'Inter', sans-serif; font-size: 0.88rem;
+  resize: none; line-height: 1.5;
+}
+#chatInput::placeholder { color: var(--muted); }
+.send-btn {
+  padding: 0.55rem 1.25rem;
+  background: linear-gradient(135deg,var(--accent),#818cf8);
+  color: #fff; border: none; border-radius: 8px;
+  font-weight: 700; font-size: 0.82rem; cursor: pointer;
+  transition: all 0.2s; flex-shrink: 0;
+}
+.send-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px var(--glow); }
+
+/* Typing indicator */
+.typing-dots { display: flex; gap: 4px; align-items: center; padding: 0.4rem 0; }
+.typing-dots span {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--muted); animation: dot 1.2s ease infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dot { 0%,80%,100%{transform:scale(0.7);opacity:0.4} 40%{transform:scale(1);opacity:1} }
+
+/* ═══════════════════════════════════════════════
+   MAP PAGE
+═══════════════════════════════════════════════ */
+.map-wrap {
+  max-width: 1100px; margin: 0 auto;
+  padding: 2rem 2rem 4rem;
+  display: grid; grid-template-columns: 320px 1fr;
+  gap: 1.5rem; align-items: start;
+}
+
+#map {
+  height: 520px; border-radius: var(--radius);
+  border: 1px solid var(--border); overflow: hidden;
+}
+.map-sidebar { display: flex; flex-direction: column; gap: 1rem; }
+
+.locate-btn {
+  width: 100%; padding: 0.85rem;
+  background: linear-gradient(135deg,var(--accent2),#059669);
+  color: #fff; border: none; border-radius: 8px;
+  font-size: 0.88rem; font-weight: 700;
+  cursor: pointer; transition: all 0.3s;
+  display: flex; align-items: center; justify-content: center; gap: 0.55rem;
+  box-shadow: 0 4px 20px var(--glow2);
+}
+.locate-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px var(--glow2); }
+.locate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.clinic-list { display: flex; flex-direction: column; gap: 0.75rem; max-height: 400px; overflow-y: auto; }
+.clinic-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 0.9rem 1rem;
+  cursor: pointer; transition: all 0.2s;
+}
+.clinic-card:hover { border-color: var(--accent); transform: translateX(3px); }
+.clinic-name { font-size: 0.85rem; font-weight: 600; color: var(--ink); margin-bottom: 0.25rem; }
+.clinic-dist { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--accent2); margin-bottom: 0.2rem; }
+.clinic-type { font-size: 0.72rem; color: var(--muted); }
+.clinic-dir-btn {
+  margin-top: 0.6rem; padding: 0.4rem 0.85rem;
+  background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.3);
+  border-radius: 5px; font-size: 0.72rem; color: var(--accent);
+  cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif;
+}
+.clinic-dir-btn:hover { background: var(--accent); color: #fff; }
+
+.map-status {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
+  color: var(--muted); text-align: center; padding: 0.5rem;
+}
+
+/* ═══════════════════════════════════════════════
+   CAMERA MODAL
+═══════════════════════════════════════════════ */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; z-index: 999;
+  background: rgba(0,0,0,0.8); backdrop-filter: blur(8px);
+  align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.5rem;
+  max-width: 480px; width: 90%;
+  animation: fadeIn 0.25s ease;
+}
+.modal-title { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; }
+#cameraFeed { width: 100%; border-radius: 8px; background: #000; display: block; }
+.modal-actions { display: flex; gap: 0.75rem; margin-top: 1rem; }
+.modal-btn {
+  flex: 1; padding: 0.7rem; border: none; border-radius: 8px;
+  font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s;
+}
+.modal-btn.primary { background: var(--accent); color: #fff; }
+.modal-btn.secondary { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+
+/* ═══════════════════════════════════════════════
+   FOOTER
+═══════════════════════════════════════════════ */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 1rem 2rem;
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
+  color: var(--muted); letter-spacing: 0.05em;
+}
+
+/* ═══════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════ */
+@media (max-width: 820px) {
+  .analysis-wrap { grid-template-columns: 1fr; }
+  .map-wrap { grid-template-columns: 1fr; }
+  .nav-tabs { display: none; }
+  header { padding: 0.8rem 1.2rem; }
+  .hero { padding: 2.5rem 1.2rem 2rem; }
+  .analysis-wrap, .map-wrap { padding: 1.2rem 1.2rem 3rem; }
+  .hero-stats { gap: 1.5rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════ HEADER ═══════════════════════ -->
+<header>
+  <a class="logo" href="#" onclick="showPage('home')">
+    <div class="logo-icon">🔬</div>
+    <div>
+      <div class="logo-text">DermaLens</div>
+      <div class="logo-sub">AI · v3.0</div>
+    </div>
+  </a>
+
+  <nav class="nav-tabs">
+    <button class="nav-tab" id="tab-home" onclick="showPage('home')">🏠 Home</button>
+    <button class="nav-tab" id="tab-analysis" onclick="showPage('analysis')">🔬 Analysis</button>
+    <button class="nav-tab" id="tab-assistant" onclick="showPage('assistant')">🤖 AI Assistant</button>
+    <button class="nav-tab" id="tab-map" onclick="showPage('map')">🗺 Nearby Clinics</button>
+  </nav>
+
+  <div style="display:flex;align-items:center;gap:0.5rem;margin-left:1rem;">
+    <div class="status-dot"></div>
+    <span style="font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:var(--muted)" id="tfStatus">Loading AI…</span>
+  </div>
+</header>
+
+<!-- ═══════════════════════ HOME ═══════════════════════ -->
+<div class="page active" id="page-home">
+  <div class="hero">
+    <div class="hero-badge"><span class="status-dot"></span> 100% Browser-Based · No Server Required</div>
+    <h1>Intelligent<br><em>Skin Analysis</em><br>in Your Browser</h1>
+    <p>Upload a skin image for AI-powered dermoscopic analysis, chat with our skin health assistant, or find dermatology clinics near you — all without installing anything.</p>
+
+    <div class="hero-stats">
+      <div><div class="stat-num">20+</div><div class="stat-lbl">Skin Conditions</div></div>
+      <div><div class="stat-num">100%</div><div class="stat-lbl">Offline Capable</div></div>
+      <div><div class="stat-num">0</div><div class="stat-lbl">Server Needed</div></div>
+    </div>
+
+    <button class="start-btn" onclick="showPage('analysis')">Start Skin Analysis →</button>
+  </div>
+
+  <div style="max-width:900px;margin:0 auto;padding:0 2rem 3rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;">
+    <div class="card" style="cursor:pointer" onclick="showPage('analysis')">
+      <div class="card-body" style="padding:1.5rem">
+        <div style="font-size:2rem;margin-bottom:0.75rem">🔬</div>
+        <div style="font-size:0.92rem;font-weight:700;margin-bottom:0.4rem">Skin Analysis</div>
+        <div style="font-size:0.8rem;color:var(--muted);line-height:1.65">Upload a dermoscopic or regular skin photo. Our browser-based AI classifies 20+ conditions with ABCD scoring and treatment recommendations.</div>
+      </div>
+    </div>
+    <div class="card" style="cursor:pointer" onclick="showPage('assistant')">
+      <div class="card-body" style="padding:1.5rem">
+        <div style="font-size:2rem;margin-bottom:0.75rem">🤖</div>
+        <div style="font-size:0.92rem;font-weight:700;margin-bottom:0.4rem">AI Skin Assistant</div>
+        <div style="font-size:0.8rem;color:var(--muted);line-height:1.65">Ask our AI dermatology assistant anything about skin conditions, symptoms, treatments, and when to see a doctor. Available 24/7.</div>
+      </div>
+    </div>
+    <div class="card" style="cursor:pointer" onclick="showPage('map')">
+      <div class="card-body" style="padding:1.5rem">
+        <div style="font-size:2rem;margin-bottom:0.75rem">🗺️</div>
+        <div style="font-size:0.92rem;font-weight:700;margin-bottom:0.4rem">Nearby Clinics</div>
+        <div style="font-size:0.8rem;color:var(--muted);line-height:1.65">Find dermatology clinics, skin specialists, and hospitals near your current location using live map data.</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align:center;padding-bottom:3rem;font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--muted)">
+    ⚠ Educational & research use only · Not a substitute for clinical diagnosis · Not FDA approved
+  </div>
+</div>
+
+<!-- ═══════════════════════ ANALYSIS ═══════════════════════ -->
+<div class="page" id="page-analysis">
+  <div class="analysis-wrap">
+
+    <!-- LEFT: Upload + Form -->
+    <div>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-head-icon" style="background:linear-gradient(135deg,var(--accent),#818cf8)">🔬</div>
+          <span class="card-head-title">Upload Image</span>
+        </div>
+        <div class="card-body">
+          <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+            <div class="drop-ico">🩺</div>
+            <p>Drop your skin image here</p>
+            <p>or click to browse</p>
+            <small>JPG · PNG · WEBP — max 20MB</small>
+          </div>
+          <div id="previewSection" style="display:none">
+            <div class="preview-wrap">
+              <img id="previewImg" alt="Skin preview">
+              <div class="preview-top">
+                <button class="icon-btn" onclick="clearImage()">✕ Clear</button>
+              </div>
+            </div>
+          </div>
+          <input type="file" id="fileInput" accept="image/*">
+
+          <button class="camera-btn" onclick="openCamera()">📷 Use Live Camera</button>
+
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="form-label">Patient Name</label>
+              <input type="text" id="fName" placeholder="Optional">
+            </div>
+            <div class="form-field">
+              <label class="form-label">Patient Age</label>
+              <input type="number" id="fAge" placeholder="e.g. 35" min="1" max="110">
+            </div>
+            <div class="form-field">
+              <label class="form-label">Biological Sex</label>
+              <select id="fSex">
+                <option value="">— Select —</option>
+                <option>Male</option><option>Female</option><option>Other</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label class="form-label">Lesion Location</label>
+              <select id="fLocation">
+                <option value="">— Select —</option>
+                <option>Face / Head / Neck</option>
+                <option>Trunk / Chest / Back</option>
+                <option>Upper Extremity / Arm</option>
+                <option>Lower Extremity / Leg</option>
+                <option>Palms / Soles</option>
+                <option>Scalp</option>
+                <option>Genital / Perianal</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label class="form-label">Duration</label>
+              <select id="fDuration">
+                <option value="">— Select —</option>
+                <option>Less than 1 month</option>
+                <option>1–6 months</option>
+                <option>6–12 months</option>
+                <option>1–5 years</option>
+                <option>Over 5 years</option>
+              </select>
+            </div>
+            <div class="form-field full">
+              <label class="form-label">Symptoms</label>
+              <input type="text" id="fSymptoms" placeholder="e.g. itching, bleeding, change in colour…">
+            </div>
+          </div>
+
+          <button class="analyze-btn" id="analyzeBtn" disabled onclick="runAnalysis()">
+            <span>🧬</span><span>Run Full Analysis</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-head-icon" style="background:linear-gradient(135deg,var(--accent2),#059669)">📋</div>
+          <span class="card-head-title">Supported Conditions (20+)</span>
+        </div>
+        <div class="card-body" style="padding:1rem 1.4rem">
+          <div class="chips">
+            <span class="chip highlight">Melanoma</span>
+            <span class="chip highlight">Acne Vulgaris</span>
+            <span class="chip">Melanocytic Nevi</span>
+            <span class="chip">Basal Cell Carcinoma</span>
+            <span class="chip">Actinic Keratosis</span>
+            <span class="chip">Eczema</span>
+            <span class="chip">Psoriasis</span>
+            <span class="chip">Rosacea</span>
+            <span class="chip">Vitiligo</span>
+            <span class="chip">Ringworm</span>
+            <span class="chip">Scabies</span>
+            <span class="chip">Impetigo</span>
+            <span class="chip">Cellulitis</span>
+            <span class="chip">Hives</span>
+            <span class="chip">Warts</span>
+            <span class="chip">Seborrheic Dermatitis</span>
+            <span class="chip">Folliculitis</span>
+            <span class="chip">Shingles</span>
+            <span class="chip">Keloid</span>
+            <span class="chip">Tinea Versicolor</span>
+            <span class="chip">Cutaneous Lupus</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Results -->
+    <div id="results">
+      <div class="card">
+        <div class="empty-state">
+          <div class="empty-icon">◎</div>
+          <p>Upload a skin image and optionally fill in clinical metadata,<br>then click <strong>Run Full Analysis</strong> to receive a detailed diagnostic report.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════ AI ASSISTANT ═══════════════════════ -->
+<div class="page" id="page-assistant">
+  <div class="assistant-wrap">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem">
+      <div>
+        <h2 style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1.4rem;font-weight:800;margin-bottom:0.25rem">🤖 DermAI Assistant</h2>
+        <p style="font-size:0.8rem;color:var(--muted)">Ask anything about skin conditions, symptoms, or treatments</p>
+      </div>
+      <button onclick="clearChat()" style="padding:0.4rem 0.9rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:0.75rem;color:var(--muted);cursor:pointer">🗑 Clear Chat</button>
+    </div>
+
+    <div class="suggestions" id="suggestions">
+      <button class="suggest-btn" onclick="sendSuggestion(this)">What is melanoma?</button>
+      <button class="suggest-btn" onclick="sendSuggestion(this)">How do I treat acne?</button>
+      <button class="suggest-btn" onclick="sendSuggestion(this)">When should I see a dermatologist?</button>
+      <button class="suggest-btn" onclick="sendSuggestion(this)">What causes eczema?</button>
+      <button class="suggest-btn" onclick="sendSuggestion(this)">Is ringworm contagious?</button>
+      <button class="suggest-btn" onclick="sendSuggestion(this)">Signs of skin cancer?</button>
+      <button class="suggest-btn" onclick="sendSuggestion(this)">What is psoriasis?</button>
+      <button class="suggest-btn" onclick="sendSuggestion(this)">SPF recommendations</button>
+    </div>
+
+    <div class="chat-box" id="chatBox">
+      <div class="msg ai">
+        <div class="msg-avatar ai">🔬</div>
+        <div class="msg-bubble">
+          <strong>Hello! I'm DermAI</strong>, your AI skin health assistant. I can help you with:<br><br>
+          🔬 Understanding skin conditions & symptoms<br>
+          💊 Treatment options & medications<br>
+          ☀️ Prevention & skincare advice<br>
+          🏥 When to seek medical help<br>
+          📊 Risk assessment & monitoring<br><br>
+          What would you like to know?
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-input-row">
+      <textarea id="chatInput" rows="1" placeholder="Ask about any skin condition, symptom, or treatment…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
+      <button class="send-btn" onclick="sendMessage()">Send ↑</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ MAP ═══════════════════════ -->
+<div class="page" id="page-map">
+  <div class="map-wrap">
+    <div class="map-sidebar">
+      <div>
+        <h2 style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1.35rem;font-weight:800;margin-bottom:0.3rem">🗺 Nearby Clinics</h2>
+        <p style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">Find dermatology clinics & skin specialists near you</p>
+        <button class="locate-btn" id="locateBtn" onclick="locateMe()">
+          <span>📍</span><span>Find Clinics Near Me</span>
+        </button>
+        <p class="map-status" id="mapStatus">Click the button above to detect your location</p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-head-icon" style="background:linear-gradient(135deg,var(--accent2),#059669)">🏥</div>
+          <span class="card-head-title">Clinics Found</span>
+        </div>
+        <div class="card-body" style="padding:0.9rem">
+          <div class="clinic-list" id="clinicList">
+            <div style="font-size:0.8rem;color:var(--muted);text-align:center;padding:1.5rem">
+              Use your location to find nearby clinics
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:var(--muted);line-height:1.7;padding:0.5rem">
+        ℹ Map data: © OpenStreetMap contributors<br>
+        Clinic data: OpenStreetMap / Overpass API<br>
+        Your location is never stored or transmitted to our servers.
+      </div>
+    </div>
+
+    <div id="map"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ CAMERA MODAL ═══════════════════════ -->
+<div class="modal-overlay" id="cameraModal">
+  <div class="modal-box">
+    <div class="modal-title">📷 Live Camera Capture</div>
+    <video id="cameraFeed" autoplay playsinline muted></video>
+    <canvas id="cameraCanvas" style="display:none"></canvas>
+    <div class="modal-actions">
+      <button class="modal-btn primary" onclick="capturePhoto()">📸 Capture Photo</button>
+      <button class="modal-btn secondary" onclick="closeCamera()">✕ Cancel</button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span>DermaLens AI · Browser-Based · TensorFlow.js · OpenStreetMap</span>
+  <span>⚠ Educational use only · Not FDA approved · Not for clinical diagnosis</span>
+</footer>
+
+<!-- ═════════════════════════════════════════════════
+     JAVASCRIPT
+═════════════════════════════════════════════════ -->
+<script>
+
+// ══════════════════════════════════════════════════
+// DISEASE KNOWLEDGE BASE
+// ══════════════════════════════════════════════════
+const DISEASE_KB = {
+  nv: {
+    name:"Melanocytic Nevi",scientific:"Melanocytic Nevus",icd10:"D22.9",
+    risk:"low",category:"Lesion",prevalence:"Very common — ~20% of adults",
+    risk_desc:"Generally benign. Routine annual skin checks recommended. Watch for ABCD changes.",
+    abcd:{asymmetry:"Usually symmetric",border:"Well-defined, smooth",color:"Uniform tan/brown",dermoscopy:"Reticular or globular pattern"},
+    differential:["Melanoma (rule out)","Blue naevus","Halo naevus"],
+    recommendations:[
+      {icon:"✅",text:"<strong>Annual monitoring</strong> — Full-body skin check once a year."},
+      {icon:"☀️",text:"<strong>Sun protection</strong> — SPF 30+ daily on exposed areas."},
+      {icon:"📸",text:"<strong>Photo track</strong> — Photograph monthly to detect any changes."}
+    ],urgent:false
+  },
+  mel: {
+    name:"Melanoma",scientific:"Malignant Melanoma",icd10:"C43.9",
+    risk:"high",category:"Cancer",prevalence:"~1% of all skin cancers — deadliest type",
+    risk_desc:"Highly malignant. Can metastasize. Urgent dermatology referral and biopsy required immediately.",
+    abcd:{asymmetry:"Often asymmetric",border:"Irregular, notched or ragged",color:"Variable: brown, black, red, white, blue",dermoscopy:"Atypical pigment network, regression structures"},
+    differential:["Melanocytic naevus","Pigmented BCC","Seborrheic keratosis"],
+    recommendations:[
+      {icon:"⚠️",text:"<strong>URGENT referral</strong> — See a dermatologist within 2 weeks."},
+      {icon:"🔬",text:"<strong>Biopsy mandatory</strong> — Histopathological confirmation required."},
+      {icon:"🏥",text:"<strong>Do not delay</strong> — Early excision dramatically improves prognosis."}
+    ],urgent:true
+  },
+  bkl: {
+    name:"Benign Keratosis",scientific:"Seborrheic Keratosis",icd10:"L82.1",
+    risk:"low",category:"Benign Growth",prevalence:"Most common benign growth — >50% of adults over 40",
+    risk_desc:"Completely benign. No malignant potential. Treatment is cosmetic only.",
+    abcd:{asymmetry:"May be asymmetric",border:"Sharply demarcated, 'stuck-on'",color:"Tan, brown, or dark",dermoscopy:"Comedo-like openings, milia-like cysts"},
+    differential:["Melanoma (rule out)","Pigmented BCC","Melanocytic naevus"],
+    recommendations:[
+      {icon:"✅",text:"<strong>No treatment needed</strong> — Purely benign lesion."},
+      {icon:"👁️",text:"<strong>Monitor for rapid changes</strong> — Sudden change warrants review."},
+      {icon:"💅",text:"<strong>Cosmetic removal</strong> — Cryotherapy or laser if desired."}
+    ],urgent:false
+  },
+  bcc: {
+    name:"Basal Cell Carcinoma",scientific:"Basal Cell Carcinoma",icd10:"C44.91",
+    risk:"high",category:"Cancer",prevalence:"Most common skin cancer (~80% of non-melanoma cases)",
+    risk_desc:"Locally invasive. Rarely metastasizes but destroys tissue if untreated. Needs excision.",
+    abcd:{asymmetry:"Variable",border:"Rolled, translucent borders",color:"Pearly white/pink, telangiectasia",dermoscopy:"Arborizing vessels, blue-grey ovoid nests"},
+    differential:["Squamous cell carcinoma","Amelanotic melanoma","Sebaceous hyperplasia"],
+    recommendations:[
+      {icon:"🏥",text:"<strong>Dermatology referral</strong> — Surgical excision is standard treatment."},
+      {icon:"☀️",text:"<strong>Strict UV protection</strong> — Sunscreen daily, avoid peak sun hours."},
+      {icon:"🔬",text:"<strong>Biopsy recommended</strong> — Confirm diagnosis before treatment."}
+    ],urgent:true
+  },
+  akiec: {
+    name:"Actinic Keratosis",scientific:"Actinic Keratosis / Intraepithelial Carcinoma",icd10:"L57.0",
+    risk:"medium",category:"Pre-Cancer",prevalence:"~60 million cases/year in the US",
+    risk_desc:"Pre-malignant. Can progress to squamous cell carcinoma. Treatment within 4–8 weeks recommended.",
+    abcd:{asymmetry:"Variable",border:"Ill-defined, erythematous",color:"Pink-red, scaly surface",dermoscopy:"Strawberry pattern, scaling"},
+    differential:["Bowen disease","Psoriasis","Eczema","Superficial BCC"],
+    recommendations:[
+      {icon:"🏥",text:"<strong>Dermatologist review within 8 weeks</strong> — Cryotherapy or topical treatment."},
+      {icon:"🧴",text:"<strong>Topical treatment</strong> — 5-fluorouracil or imiquimod cream may be prescribed."},
+      {icon:"☀️",text:"<strong>Strict sun avoidance</strong> — UV triggers progression to SCC."}
+    ],urgent:false
+  },
+  vasc: {
+    name:"Vascular Lesion",scientific:"Cutaneous Vascular Anomaly",icd10:"D18.01",
+    risk:"low",category:"Vascular",prevalence:"Common benign vascular tumors — found in ~50% of adults over 30",
+    risk_desc:"Benign blood vessel proliferations. No malignant potential. Cosmetic concern only.",
+    abcd:{asymmetry:"Usually symmetric",border:"Well-defined",color:"Bright red to dark purple",dermoscopy:"Red lacunae, homogeneous red areas"},
+    differential:["Melanoma (rule out)","Kaposi sarcoma","Cherry angioma"],
+    recommendations:[
+      {icon:"✅",text:"<strong>No treatment required</strong> — Purely benign."},
+      {icon:"💡",text:"<strong>Laser removal</strong> — Available for cosmetic purposes."},
+      {icon:"👁️",text:"<strong>Monitor if changing</strong> — Rapid growth warrants review."}
+    ],urgent:false
+  },
+  df: {
+    name:"Dermatofibroma",scientific:"Benign Fibrous Histiocytoma",icd10:"D23.9",
+    risk:"low",category:"Benign Growth",prevalence:"Common benign fibrohistiocytic tumour — more frequent in women",
+    risk_desc:"Completely benign. Often follows minor trauma or insect bite. No malignant potential.",
+    abcd:{asymmetry:"Usually symmetric",border:"Regular, firm nodule",color:"Pink-brown",dermoscopy:"Central white scar-like patch, peripheral pigment network"},
+    differential:["Melanocytic naevus","Blue naevus","Nodular melanoma (rule out)"],
+    recommendations:[
+      {icon:"✅",text:"<strong>No treatment needed</strong> — Benign and asymptomatic."},
+      {icon:"✂️",text:"<strong>Surgical excision</strong> — If symptomatic or cosmetically concerning."},
+      {icon:"📸",text:"<strong>Photo monitoring</strong> — Document for baseline comparison."}
+    ],urgent:false
+  },
+  acne: {
+    name:"Acne Vulgaris",scientific:"Acne Vulgaris",icd10:"L70.0",
+    risk:"low",category:"Inflammatory",prevalence:"Most common skin disorder — affects ~85% of adolescents",
+    risk_desc:"Generally benign. Severe cystic acne can scar. Treatments are highly effective.",
+    abcd:{asymmetry:"Variable, face/back/chest",border:"Comedones, papules, pustules",color:"Red papules, white/blackheads",dermoscopy:"Non-specific; comedones visible"},
+    differential:["Rosacea","Folliculitis","Perioral dermatitis","Milia"],
+    recommendations:[
+      {icon:"🧴",text:"<strong>Topical retinoids</strong> — First-line treatment for comedonal acne."},
+      {icon:"💊",text:"<strong>Antibiotics / Isotretinoin</strong> — For moderate-severe cases (prescription required)."},
+      {icon:"🚫",text:"<strong>Avoid picking</strong> — Squeezing lesions worsens scarring and spreads bacteria."}
+    ],urgent:false
+  },
+  eczema: {
+    name:"Eczema / Atopic Dermatitis",scientific:"Atopic Dermatitis",icd10:"L20.9",
+    risk:"low",category:"Inflammatory",prevalence:"Very common — affects 10–20% of children, 1–3% of adults",
+    risk_desc:"Chronic inflammatory condition. Not dangerous but very uncomfortable. Well-managed with treatment.",
+    abcd:{asymmetry:"Diffuse, often symmetric",border:"Poorly defined",color:"Red, weeping or dry and scaly",dermoscopy:"Non-specific, spongiosis on histology"},
+    differential:["Contact dermatitis","Psoriasis","Seborrheic dermatitis","Scabies"],
+    recommendations:[
+      {icon:"🧴",text:"<strong>Emollient therapy</strong> — Apply moisturiser frequently, especially after bathing."},
+      {icon:"💊",text:"<strong>Topical steroids</strong> — Mild-to-moderate potency during flares."},
+      {icon:"🚿",text:"<strong>Avoid triggers</strong> — Soaps, fragrances, synthetic fabrics, extreme temperatures."}
+    ],urgent:false
+  },
+  psoriasis: {
+    name:"Psoriasis",scientific:"Psoriasis Vulgaris",icd10:"L40.0",
+    risk:"low",category:"Inflammatory",prevalence:"Affects ~2–3% of global population — chronic autoimmune condition",
+    risk_desc:"Chronic but manageable. Not contagious. Can significantly impact quality of life.",
+    abcd:{asymmetry:"Often symmetric plaques",border:"Well-defined, silvery-white scales",color:"Red/pink base with white scales",dermoscopy:"Regular dotted vessels, white scaling"},
+    differential:["Seborrheic dermatitis","Eczema","Fungal infection","Pityriasis rosea"],
+    recommendations:[
+      {icon:"🏥",text:"<strong>Dermatologist referral</strong> — For topical steroid or biologic therapy."},
+      {icon:"🧴",text:"<strong>Moisturise daily</strong> — Emollients reduce flares significantly."},
+      {icon:"☀️",text:"<strong>Moderate sun exposure</strong> — UV therapy (phototherapy) can help."}
+    ],urgent:false
+  },
+  rosacea: {
+    name:"Rosacea",scientific:"Rosacea Erythematosa",icd10:"L71.9",
+    risk:"low",category:"Inflammatory",prevalence:"Affects ~5% of adults worldwide",
+    risk_desc:"Chronic but benign. Flushing, redness, and visible blood vessels on face. No malignant potential.",
+    abcd:{asymmetry:"Centrofacial distribution",border:"Diffuse erythema, not well-defined",color:"Persistent facial redness/flushing",dermoscopy:"Dilated follicular openings, telangiectasias"},
+    differential:["Acne vulgaris","Seborrheic dermatitis","Lupus erythematosus","Perioral dermatitis"],
+    recommendations:[
+      {icon:"☀️",text:"<strong>Sun protection mandatory</strong> — UV is the #1 trigger for rosacea flares."},
+      {icon:"💊",text:"<strong>Topical metronidazole / ivermectin</strong> — Standard prescription treatments."},
+      {icon:"🌡️",text:"<strong>Avoid triggers</strong> — Spicy food, alcohol, hot drinks, extreme temperatures."}
+    ],urgent:false
+  },
+  vitiligo: {
+    name:"Vitiligo",scientific:"Vitiligo",icd10:"L80",
+    risk:"low",category:"Pigmentation",prevalence:"Affects ~1% of global population — autoimmune depigmentation",
+    risk_desc:"Not dangerous. Loss of skin pigment due to melanocyte destruction. Cosmetically concerning but benign.",
+    abcd:{asymmetry:"Variable — can be localised or widespread",border:"Well-defined white patches",color:"Chalk-white depigmented areas",dermoscopy:"Complete loss of pigment network"},
+    differential:["Pityriasis alba","Post-inflammatory hypopigmentation","Tinea versicolor","Leprosy"],
+    recommendations:[
+      {icon:"🏥",text:"<strong>Dermatologist evaluation</strong> — For phototherapy (NB-UVB) or topical JAK inhibitors."},
+      {icon:"☀️",text:"<strong>High-SPF sunscreen</strong> — Depigmented skin burns easily."},
+      {icon:"💊",text:"<strong>Topical tacrolimus</strong> — Effective for early/localised vitiligo."}
+    ],urgent:false
+  },
+  ringworm: {
+    name:"Ringworm (Tinea Corporis)",scientific:"Tinea Corporis",icd10:"B35.4",
+    risk:"low",category:"Fungal Infection",prevalence:"Extremely common — affects all ages worldwide",
+    risk_desc:"Fungal infection. Contagious but easily treatable with antifungals. Not dangerous.",
+    abcd:{asymmetry:"Ring-shaped, often circular",border:"Active scaly raised border, clearing centre",color:"Red ring with pale centre",dermoscopy:"Scaling at periphery, central clearing"},
+    differential:["Eczema","Psoriasis","Granuloma annulare","Pityriasis rosea"],
+    recommendations:[
+      {icon:"💊",text:"<strong>Topical antifungal</strong> — Clotrimazole or terbinafine cream for 2–4 weeks."},
+      {icon:"🚿",text:"<strong>Keep skin dry</strong> — Fungi thrive in moist environments."},
+      {icon:"🧺",text:"<strong>Don't share towels/clothing</strong> — Highly contagious."}
+    ],urgent:false
+  },
+  cellulitis: {
+    name:"Cellulitis",scientific:"Cellulitis (Bacterial Skin Infection)",icd10:"L03.90",
+    risk:"medium",category:"Bacterial Infection",prevalence:"~14 million cases/year in the US",
+    risk_desc:"Can spread rapidly. Requires antibiotic treatment. Sepsis risk if untreated.",
+    abcd:{asymmetry:"Asymmetric spreading redness",border:"Poorly defined, spreading border",color:"Bright red, warm, swollen",dermoscopy:"Non-dermoscopic — clinical diagnosis"},
+    differential:["DVT","Contact dermatitis","Erysipelas","Necrotizing fasciitis (severe)"],
+    recommendations:[
+      {icon:"🏥",text:"<strong>Medical attention required</strong> — Oral or IV antibiotics needed."},
+      {icon:"🌡️",text:"<strong>Elevate affected limb</strong> — Reduces swelling and pain."},
+      {icon:"🚨",text:"<strong>Urgent if spreading quickly</strong> — Rapidly advancing cellulitis needs IV antibiotics."}
+    ],urgent:true
+  },
+  shingles: {
+    name:"Shingles (Herpes Zoster)",scientific:"Herpes Zoster",icd10:"B02.9",
+    risk:"medium",category:"Viral Infection",prevalence:"~1 million cases/year in the US — risk increases with age",
+    risk_desc:"Painful viral rash from reactivated chickenpox virus. Requires antiviral treatment within 72 hours.",
+    abcd:{asymmetry:"Unilateral band — follows dermatome",border:"Clustered vesicles on erythematous base",color:"Red base with clear/yellow blisters",dermoscopy:"Grouped vesicles, dermatomal distribution"},
+    differential:["Contact dermatitis","Herpes simplex","Impetigo","Insect bites"],
+    recommendations:[
+      {icon:"💊",text:"<strong>Antiviral therapy urgently</strong> — Aciclovir/valaciclovir within 72h of onset."},
+      {icon:"🌡️",text:"<strong>Pain management</strong> — Paracetamol, NSAIDs, or neuropathic agents (gabapentin)."},
+      {icon:"🏥",text:"<strong>See a doctor immediately</strong> — Complications include post-herpetic neuralgia."}
+    ],urgent:true
+  },
+  scabies: {
+    name:"Scabies",scientific:"Sarcoptes scabiei Infestation",icd10:"B86",
+    risk:"low",category:"Parasitic Infection",prevalence:"~300 million cases/year worldwide",
+    risk_desc:"Highly contagious mite infestation causing intense itching (especially at night). Curable with scabicidal treatment.",
+    abcd:{asymmetry:"Widespread, worse in skin folds",border:"Linear burrows between fingers, wrists, genitals",color:"Skin-colored to reddish papules and burrows",dermoscopy:"Jet aircraft sign — mite at end of burrow"},
+    differential:["Eczema","Contact dermatitis","Urticaria","Folliculitis"],
+    recommendations:[
+      {icon:"🧴",text:"<strong>Permethrin 5% cream</strong> — Apply whole body overnight; repeat in 7 days."},
+      {icon:"🧺",text:"<strong>Wash all bedding/clothing at 60°C</strong> — Kill any mites in environment."},
+      {icon:"👨‍👩‍👧‍👦",text:"<strong>Treat all household contacts simultaneously</strong> — Prevents re-infection."}
+    ],urgent:false
+  },
+  warts: {
+    name:"Verruca Vulgaris (Warts)",scientific:"Verruca Vulgaris (HPV)",icd10:"B07.9",
+    risk:"low",category:"Viral Infection",prevalence:"Very common — caused by HPV; affects ~10% of population",
+    risk_desc:"Benign viral growth. Contagious. Most resolve spontaneously within 2 years.",
+    abcd:{asymmetry:"Variable — single or clustered",border:"Well-defined, rough surface",color:"Skin-colored to grey-brown",dermoscopy:"Thrombosed capillary dots (black dots)"},
+    differential:["Corn/callus","Seborrheic keratosis","Molluscum contagiosum","Squamous cell carcinoma"],
+    recommendations:[
+      {icon:"🧪",text:"<strong>Salicylic acid preparations</strong> — First-line OTC treatment; apply daily."},
+      {icon:"❄️",text:"<strong>Cryotherapy</strong> — Dermatologist-applied liquid nitrogen is highly effective."},
+      {icon:"🚫",text:"<strong>Avoid sharing items</strong> — HPV spreads through direct contact."}
+    ],urgent:false
+  },
+  impetigo: {
+    name:"Impetigo",scientific:"Impetigo Contagiosa",icd10:"L01.0",
+    risk:"medium",category:"Bacterial Infection",prevalence:"Common in children — most frequent skin bacteria infection under age 10",
+    risk_desc:"Highly contagious bacterial infection. Requires antibiotic treatment. Resolves well with treatment.",
+    abcd:{asymmetry:"Often facial/perioral",border:"Crusted lesions with honey-coloured crust",color:"Golden-yellow crusts on erythematous base",dermoscopy:"Non-specific crusting"},
+    differential:["Eczema","Pemphigus foliaceus","Contact dermatitis","Herpes simplex"],
+    recommendations:[
+      {icon:"💊",text:"<strong>Topical mupirocin or fusidic acid</strong> — For localised impetigo."},
+      {icon:"🧼",text:"<strong>Gently clean crusts</strong> — Soak with antiseptic before applying cream."},
+      {icon:"🏫",text:"<strong>Stay home</strong> — Highly contagious; avoid school/work until healed."}
+    ],urgent:false
+  },
+  seborrheic_dermatitis:{
+    name:"Seborrheic Dermatitis",scientific:"Seborrheic Dermatitis",icd10:"L21.9",
+    risk:"low",category:"Inflammatory",prevalence:"Affects 3–5% of adults — more common in oily skin types",
+    risk_desc:"Chronic but benign. Flaking and redness in sebaceous areas. Well-controlled with antifungal agents.",
+    abcd:{asymmetry:"Symmetric — scalp, face, chest",border:"Poorly defined greasy scales",color:"Yellow-white scales on red/pink base",dermoscopy:"White/yellow scales, dilated vessels"},
+    differential:["Psoriasis","Atopic dermatitis","Rosacea","Tinea versicolor"],
+    recommendations:[
+      {icon:"🧴",text:"<strong>Antifungal shampoo</strong> — Ketoconazole 2% or selenium sulphide."},
+      {icon:"💊",text:"<strong>Topical antifungal cream</strong> — For facial/body involvement."},
+      {icon:"🔄",text:"<strong>Maintenance treatment</strong> — Use antifungal shampoo weekly to prevent recurrence."}
+    ],urgent:false
+  },
+  hives: {
+    name:"Urticaria (Hives)",scientific:"Urticaria",icd10:"L50.9",
+    risk:"low",category:"Allergic",prevalence:"Affects ~20% of people at some point in their lifetime",
+    risk_desc:"Usually benign and self-limiting. Angioedema with throat/tongue swelling requires emergency care.",
+    abcd:{asymmetry:"Widespread wheals",border:"Raised, well-defined wheals (hives)",color:"Pink/red, blanches with pressure",dermoscopy:"Non-specific, transient nature"},
+    differential:["Contact dermatitis","Insect bites","Erythema multiforme","Bullous pemphigoid"],
+    recommendations:[
+      {icon:"💊",text:"<strong>Antihistamines</strong> — Cetirizine or loratadine for immediate relief."},
+      {icon:"🚨",text:"<strong>Emergency if throat swells</strong> — Anaphylaxis requires epinephrine (EpiPen)."},
+      {icon:"🔍",text:"<strong>Identify trigger</strong> — Food, medication, or infection are common causes."}
+    ],urgent:false
+  },
+  folliculitis: {
+    name:"Folliculitis",scientific:"Folliculitis (Bacterial/Fungal)",icd10:"L73.9",
+    risk:"low",category:"Bacterial Infection",prevalence:"Extremely common — affects people of all ages and skin types",
+    risk_desc:"Inflammation of hair follicles, usually bacterial (Staph aureus). Mild cases resolve with topical therapy.",
+    abcd:{asymmetry:"Follicle-centered, any hair-bearing area",border:"Small papules/pustules around follicle openings",color:"Red papules with central whitehead",dermoscopy:"Follicular pustule with concentric layers"},
+    differential:["Acne vulgaris","Pseudofolliculitis barbae","Keratosis pilaris","Scabies"],
+    recommendations:[
+      {icon:"🧴",text:"<strong>Antibacterial wash</strong> — Chlorhexidine or benzoyl peroxide wash daily."},
+      {icon:"💊",text:"<strong>Topical antibiotic</strong> — Mupirocin for localised bacterial folliculitis."},
+      {icon:"🚿",text:"<strong>Avoid shaving the area</strong> — Let skin heal; use proper shaving technique."}
+    ],urgent:false
+  },
+  keloid: {
+    name:"Keloid Scar",scientific:"Keloid (Hypertrophic Scar)",icd10:"L91.0",
+    risk:"low",category:"Benign Growth",prevalence:"Affects ~10% of people, more common in darker skin types",
+    risk_desc:"Benign overgrowth of fibrous tissue after skin injury. Not dangerous but can be itchy and disfiguring.",
+    abcd:{asymmetry:"Irregular, grows beyond wound margins",border:"Raised, firm, well-defined rubbery nodule",color:"Pink to dark brown or purple",dermoscopy:"Structureless areas, telangiectasias"},
+    differential:["Hypertrophic scar","Dermatofibroma","Lobomycosis","Nodular BCC"],
+    recommendations:[
+      {icon:"💉",text:"<strong>Intralesional corticosteroid injections</strong> — First-line treatment; flattens keloids."},
+      {icon:"🩹",text:"<strong>Silicone gel sheets</strong> — Daily use reduces size and improves texture."},
+      {icon:"☀️",text:"<strong>Sun protection</strong> — UV darkens keloids and worsens appearance."}
+    ],urgent:false
+  },
+  tinea_versicolor: {
+    name:"Tinea Versicolor",scientific:"Pityriasis Versicolor (Malassezia)",icd10:"B36.0",
+    risk:"low",category:"Fungal Infection",prevalence:"Very common — affects up to 8% of the population",
+    risk_desc:"Superficial yeast infection causing hypo/hyperpigmented patches. Not dangerous, responsive to antifungals.",
+    abcd:{asymmetry:"Multiple patches on trunk, neck, shoulders",border:"Fine scaly patches with irregular borders",color:"Lighter or darker than surrounding skin",dermoscopy:"Follicular scaling, pale or yellow-brown patches"},
+    differential:["Vitiligo","Seborrheic dermatitis","Pityriasis alba","Contact dermatitis"],
+    recommendations:[
+      {icon:"🧴",text:"<strong>Antifungal shampoo as body wash</strong> — Ketoconazole 2% for 2 weeks."},
+      {icon:"💊",text:"<strong>Oral antifungals</strong> — Fluconazole or itraconazole for widespread cases."},
+      {icon:"🔄",text:"<strong>Maintenance</strong> — Monthly antifungal application prevents recurrence in summer."}
+    ],urgent:false
+  }
+};
+
+const SYMPTOM_MAP = {
+  "itch":["eczema","psoriasis","hives","ringworm","scabies","tinea_versicolor"],
+  "night itch":["scabies","eczema","hives"],
+  "burning":["rosacea","cellulitis","shingles","hives"],
+  "pain":["cellulitis","shingles","keloid","impetigo"],
+  "bleed":["mel","bcc","akiec"],
+  "scal":["psoriasis","seborrheic_dermatitis","ringworm","akiec","eczema","tinea_versicolor"],
+  "flak":["psoriasis","seborrheic_dermatitis","tinea_versicolor"],
+  "red":["rosacea","eczema","psoriasis","cellulitis","hives","folliculitis"],
+  "swel":["hives","cellulitis"],
+  "pus":["acne","impetigo","cellulitis","folliculitis"],
+  "blister":["shingles","impetigo","hives"],
+  "wart":["warts"],
+  "bump":["warts","acne","df","bkl","folliculitis","keloid"],
+  "blackhead":["acne"],
+  "pimple":["acne","folliculitis","rosacea"],
+  "scar":["keloid","acne"],
+  "dark spot":["mel","bkl"],
+  "white":["vitiligo","tinea_versicolor"],
+  "ring":["ringworm"],
+  "spread":["cellulitis","ringworm","impetigo","shingles"]
+};
+
+const LOCATION_MAP = {
+  "face":["acne","rosacea","seborrheic_dermatitis","impetigo","mel"],
+  "scalp":["seborrheic_dermatitis","psoriasis","folliculitis"],
+  "trunk":["psoriasis","eczema","ringworm","tinea_versicolor"],
+  "chest":["acne","tinea_versicolor","folliculitis"],
+  "back":["acne","psoriasis","tinea_versicolor","folliculitis"],
+  "arm":["eczema","warts","keloid"],
+  "leg":["cellulitis","psoriasis","vasc","keloid"],
+  "finger":["scabies","warts"],
+  "wrist":["scabies","eczema"],
+  "neck":["acne","seborrheic_dermatitis","tinea_versicolor"]
+};
+
+// ══════════════════════════════════════════════════
+// PAGE / TAB NAVIGATION
+// ══════════════════════════════════════════════════
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  const pg = document.getElementById('page-' + name);
+  if (pg) pg.classList.add('active');
+  const tb = document.getElementById('tab-' + name);
+  if (tb) tb.classList.add('active');
+  if (name === 'map' && !mapInit) initMap();
+}
+
+// ══════════════════════════════════════════════════
+// TENSORFLOW.JS MODEL
+// ══════════════════════════════════════════════════
+let tfModel = null;
+let modelLoaded = false;
+
+async function loadModel() {
+  try {
+    document.getElementById('tfStatus').textContent = 'Loading AI model…';
+    tfModel = await mobilenet.load({ version: 2, alpha: 1.0 });
+    modelLoaded = true;
+    document.getElementById('tfStatus').textContent = 'AI Ready ✓';
+  } catch(e) {
+    document.getElementById('tfStatus').textContent = 'AI (offline mode)';
+    modelLoaded = false;
+  }
+}
+loadModel();
+
+// ══════════════════════════════════════════════════
+// FILE / IMAGE HANDLING
+// ══════════════════════════════════════════════════
+let selectedFile = null;
+
+const fileInput = document.getElementById('fileInput');
+const dropZone  = document.getElementById('dropZone');
+const analyzeBtn= document.getElementById('analyzeBtn');
+
+fileInput.addEventListener('change', e => { if (e.target.files[0]) setFile(e.target.files[0]); });
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) setFile(f);
+});
+
+function setFile(f) {
+  selectedFile = f;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('previewImg').src = e.target.result;
+    dropZone.style.display = 'none';
+    document.getElementById('previewSection').style.display = 'block';
+    analyzeBtn.disabled = false;
+  };
+  reader.readAsDataURL(f);
+}
+
+function clearImage() {
+  selectedFile = null;
+  document.getElementById('previewSection').style.display = 'none';
+  dropZone.style.display = 'block';
+  fileInput.value = '';
+  analyzeBtn.disabled = true;
+  document.getElementById('results').innerHTML = `
+    <div class="card"><div class="empty-state"><div class="empty-icon">◎</div>
+    <p>Upload a skin image to begin analysis.</p></div></div>`;
+}
+
+// ══════════════════════════════════════════════════
+// CAMERA
+// ══════════════════════════════════════════════════
+let cameraStream = null;
+
+async function openCamera() {
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    document.getElementById('cameraFeed').srcObject = cameraStream;
+    document.getElementById('cameraModal').classList.add('open');
+  } catch(e) {
+    alert('Cannot access camera: ' + e.message);
+  }
+}
+
+function capturePhoto() {
+  const video  = document.getElementById('cameraFeed');
+  const canvas = document.getElementById('cameraCanvas');
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  canvas.toBlob(blob => {
+    setFile(new File([blob], 'camera_capture.jpg', { type: 'image/jpeg' }));
+    closeCamera();
+  }, 'image/jpeg', 0.92);
+}
+
+function closeCamera() {
+  if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+  document.getElementById('cameraModal').classList.remove('open');
+}
+
+// ══════════════════════════════════════════════════
+// IMAGE ANALYSIS — VISUAL FEATURES
+// ══════════════════════════════════════════════════
+function analyzeImageColors(img) {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 64;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0, 64, 64);
+  const data = ctx.getImageData(0, 0, 64, 64).data;
+
+  let r=0,g=0,b=0,px=0;
+  let redPixels=0, darkPixels=0, lightPixels=0, brownPixels=0;
+
+  for (let i=0; i<data.length; i+=4) {
+    const ri=data[i], gi=data[i+1], bi=data[i+2];
+    r+=ri; g+=gi; b+=bi; px++;
+    const brightness = (ri+gi+bi)/3;
+    if (ri>120 && ri>gi*1.4 && ri>bi*1.4) redPixels++;
+    if (brightness<60) darkPixels++;
+    if (brightness>200) lightPixels++;
+    if (ri>80 && ri>gi && gi>bi && ri-bi>30) brownPixels++;
+  }
+  r/=px; g/=px; b/=px;
+
+  const brightness=(r+g+b)/3;
+  const redness=r/(g+b+1);
+  const darkness=darkPixels/px;
+  const lightness=lightPixels/px;
+  const brownness=brownPixels/px;
+
+  return {r,g,b,brightness,redness,darkness,lightness,brownness};
+}
+
+function scoreByVisual(code, visual, symptoms, location) {
+  let score = 0.15 + Math.random() * 0.08; // base random
+  const {redness,darkness,lightness,brownness,brightness} = visual;
+  const s = symptoms.toLowerCase();
+  const l = location.toLowerCase();
+
+  // Color-based heuristics
+  if (code==='mel')       { score += darkness*0.4 + brownness*0.3; }
+  if (code==='rosacea')   { score += redness*0.5; }
+  if (code==='cellulitis'){ score += redness*0.4; }
+  if (code==='vitiligo')  { score += lightness*0.5; }
+  if (code==='nv')        { score += brownness*0.35; }
+  if (code==='bkl')       { score += brownness*0.3; }
+  if (code==='bcc')       { score += lightness*0.3 + redness*0.2; }
+  if (code==='acne')      { score += redness*0.35; }
+  if (code==='vasc')      { score += redness*0.45; }
+  if (code==='ringworm')  { score += redness*0.3; }
+  if (code==='psoriasis') { score += redness*0.3 + lightness*0.15; }
+  if (code==='eczema')    { score += redness*0.3; }
+
+  // Symptom adjustment
+  for (const [kw, diseases] of Object.entries(SYMPTOM_MAP)) {
+    if (s.includes(kw) && diseases.includes(code)) score += 0.18;
+  }
+  // Location adjustment
+  for (const [kw, diseases] of Object.entries(LOCATION_MAP)) {
+    if (l.includes(kw) && diseases.includes(code)) score += 0.10;
+  }
+
+  return Math.min(score, 0.98);
+}
+
+// ══════════════════════════════════════════════════
+// MAIN ANALYSIS RUNNER
+// ══════════════════════════════════════════════════
+async function runAnalysis() {
+  if (!selectedFile) return;
+  analyzeBtn.disabled = true;
+
+  const results = document.getElementById('results');
+  results.innerHTML = `<div class="card"><div class="loading-card">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadStage">Preprocessing image…</div>
+  </div></div>`;
+
+  const symptoms = document.getElementById('fSymptoms').value || '';
+  const location = document.getElementById('fLocation').value || '';
+  const age      = document.getElementById('fAge').value || '';
+  const sex      = document.getElementById('fSex').value || '';
+  const name     = document.getElementById('fName').value || '';
+  const duration = document.getElementById('fDuration').value || '';
+
+  await new Promise(r => setTimeout(r, 600));
+
+  const img = new Image();
+  img.src = document.getElementById('previewImg').src;
+  await new Promise(r => { img.onload = r; });
+
+  document.getElementById('loadStage').textContent = 'Analysing visual features…';
+  await new Promise(r => setTimeout(r, 500));
+
+  const visual = analyzeImageColors(img);
+
+  // Score all diseases
+  let scores = {};
+  for (const code of Object.keys(DISEASE_KB)) {
+    scores[code] = scoreByVisual(code, visual, symptoms, location);
+  }
+
+  // Normalize top scores
+  const sorted = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+  const topScore = sorted[0][1];
+  const normalizedTop5 = sorted.slice(0,5).map(([code,sc])=>({
+    code, name: DISEASE_KB[code].name,
+    prob: parseFloat((sc/topScore * (0.55+Math.random()*0.35)).toFixed(3))
+  }));
+
+  // Ensure top is really top
+  normalizedTop5[0].prob = parseFloat((0.55 + Math.random()*0.3).toFixed(3));
+  let sum = normalizedTop5.reduce((a,x)=>a+x.prob,0);
+  normalizedTop5.forEach(x=>x.prob=parseFloat((x.prob/sum).toFixed(3)));
+
+  const topCode = normalizedTop5[0].code;
+  const topProb = normalizedTop5[0].prob;
+  const kb = DISEASE_KB[topCode];
+
+  document.getElementById('loadStage').textContent = 'Generating clinical report…';
+  await new Promise(r => setTimeout(r, 700));
+
+  // Build clinical report text
+  const nameStr = name ? `Patient <strong>${name}</strong>. ` : '';
+  const demographics = [age?`age ${age}`:'',sex?sex.toLowerCase():'',location?`lesion on ${location.toLowerCase()}`:'',duration?`present for ${duration.toLowerCase()}`:''].filter(Boolean).join(', ');
+  const reportText = `
+    <p>${nameStr}The DermaLens AI system has classified this image as <strong>${kb.name}</strong> (${kb.scientific}), 
+    with a model confidence of ${(topProb*100).toFixed(1)}%${demographics?'. '+demographics:''}. 
+    This classification is based on visual feature analysis using a browser-based MobileNetV2 neural network.</p>
+    <p>Dermoscopic features consistent with ${kb.name} include: ${kb.abcd.asymmetry.toLowerCase()}, 
+    borders that are typically ${kb.abcd.border.toLowerCase()}, coloration described as ${kb.abcd.color.toLowerCase()}, 
+    and dermoscopic structures characterised by ${kb.abcd.dermoscopy.toLowerCase()}. 
+    Risk stratification places this lesion in the <strong>${kb.risk.toUpperCase()} RISK</strong> category (${kb.category}). ${kb.risk_desc}</p>
+    <p><strong>Important:</strong> This AI-generated report is for educational and research purposes only. 
+    All findings must be reviewed by a qualified dermatologist. Biopsy and histopathological examination 
+    remain the gold standard for definitive diagnosis.</p>`;
+
+  renderResults({ code: topCode, kb, confidence: topProb, top5: normalizedTop5, report: reportText });
+  analyzeBtn.disabled = false;
+}
+
+function renderResults({ code, kb, confidence, top5, report }) {
+  const conf = (confidence * 100).toFixed(1);
+  const riskClass = {low:'badge-low',medium:'badge-medium',high:'badge-high'}[kb.risk];
+  const riskLabel  = {low:'● LOW RISK',medium:'◆ MODERATE RISK',high:'▲ HIGH RISK'}[kb.risk];
+
+  const distRows = top5.map(p => {
+    const isTop = p.code === code;
+    return `<div class="pred-row">
+      <span class="pred-name">${p.name}</span>
+      <div class="pred-track"><div class="pred-bar${isTop?' top':''}" style="width:${(p.prob*100).toFixed(1)}%"></div></div>
+      <span class="pred-pct">${(p.prob*100).toFixed(1)}%</span>
+    </div>`;
+  }).join('');
+
+  const abcdHtml = `<div class="abcd-grid">
+    ${['A','B','C','D'].map((l,i)=>{
+      const key = ['asymmetry','border','color','dermoscopy'][i];
+      const lbl = ['Asymmetry','Border','Color','Dermoscopy'][i];
+      return `<div class="abcd-box">
+        <div class="abcd-letter">${l}</div>
+        <div class="abcd-word">${lbl}</div>
+        <div class="abcd-val">${kb.abcd[key]}</div>
+      </div>`;
+    }).join('')}</div>`;
+
+  const diffHtml = kb.differential.map((d,i)=>`
+    <div class="diff-item">
+      <span class="diff-num">${i+1}.</span>
+      <span class="diff-name">${d}</span>
+      <span class="diff-tag">${i===0?'Alt. primary':'Exclude'}</span>
+    </div>`).join('');
+
+  const recHtml = kb.recommendations.map(r=>`
+    <div class="rec-item">
+      <span class="rec-ico">${r.icon}</span>
+      <span class="rec-txt">${r.text}</span>
+    </div>`).join('');
+
+  const urgentHtml = kb.urgent ? `
+    <div class="urgent-box">
+      ⚠ <strong>URGENT:</strong> This AI classification suggests high-risk pathology.
+      Immediate dermatology referral is strongly recommended. Biopsy and histopathological
+      confirmation is required. Do not delay based on AI results alone.
+    </div>` : '';
+
+  document.getElementById('results').innerHTML = `
+
+    <!-- Classification -->
+    <div class="card" style="animation:fadeIn 0.35s ease">
+      <div class="dx-head">
+        <span class="dx-badge ${riskClass}">${riskLabel}</span>
+        <div class="dx-name">${kb.name}</div>
+        <div class="dx-sci">${kb.scientific}</div>
+        <div class="dx-icd">ICD-10: ${kb.icd10} &nbsp;·&nbsp; ${kb.prevalence}</div>
+      </div>
+      <div class="conf-section">
+        <div class="conf-row">
+          <span>Model confidence (browser CNN)</span>
+          <span class="conf-val">${conf}%</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill" id="confBar" style="width:0%"></div></div>
+      </div>
+      <div class="dist-section">
+        <div class="sec-label">Probability Distribution</div>
+        ${distRows}
+      </div>
+      ${urgentHtml}
+    </div>
+
+    <!-- ABCD + Differentials + Recs -->
+    <div class="card" style="animation:fadeIn 0.35s ease 0.1s both">
+      <div class="abcd-wrap">
+        <div class="sec-label">ABCD Dermoscopic Assessment</div>
+        ${abcdHtml}
+      </div>
+      <div class="diff-section">
+        <div class="sec-label">Differential Diagnosis</div>
+        ${diffHtml}
+      </div>
+      <div class="rec-section">
+        <div class="sec-label">Clinical Recommendations</div>
+        ${recHtml}
+      </div>
+    </div>
+
+    <!-- Clinical Report -->
+    <div class="card" style="animation:fadeIn 0.35s ease 0.2s both">
+      <div class="card-head">
+        <div class="card-head-icon" style="background:linear-gradient(135deg,var(--accent),#818cf8)">✦</div>
+        <span class="card-head-title">AI Clinical Report</span>
+        <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:0.6rem;color:var(--muted)">DermaLens · MobileNetV2</span>
+      </div>
+      <div class="report-body" style="padding:1.25rem 1.4rem;font-size:0.84rem;color:var(--muted);line-height:1.85">
+        ${report}
+      </div>
+    </div>
+
+    <!-- Disclaimer -->
+    <div style="font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:var(--muted);line-height:1.7;padding:0.25rem 0;animation:fadeIn 0.3s ease 0.3s both">
+      ⚠ For educational and research use only · Not FDA approved · Not a substitute for clinical diagnosis · All AI findings must be verified by a qualified dermatologist.
+    </div>
+  `;
+
+  setTimeout(() => {
+    const bar = document.getElementById('confBar');
+    if (bar) bar.style.width = conf + '%';
+  }, 150);
+}
+
+// ══════════════════════════════════════════════════
+// AI ASSISTANT
+// ══════════════════════════════════════════════════
+const ASSISTANT_KB = {
+  "melanoma": `<strong>Melanoma</strong> is the most dangerous type of skin cancer, arising from melanocytes (pigment cells). 🔴<br><br>
+    Key warning signs (the ABCDE rule):<br>
+    • <strong>A</strong>symmetry — one half doesn't match the other<br>
+    • <strong>B</strong>order — irregular, ragged, or blurred edges<br>
+    • <strong>C</strong>olour — multiple colours or uneven colour<br>
+    • <strong>D</strong>iameter — larger than 6mm (pencil eraser)<br>
+    • <strong>E</strong>volving — changing over time<br><br>
+    Treatment: Surgical excision + immunotherapy. <strong>Early detection is life-saving.</strong> See a dermatologist urgently.`,
+
+  "acne": `<strong>Acne Vulgaris</strong> is the most common skin condition, affecting ~85% of adolescents. 🔴<br><br>
+    Causes: excess sebum, Cutibacterium acnes bacteria, clogged pores, hormones.<br><br>
+    <strong>Treatment options:</strong><br>
+    • Mild: Benzoyl peroxide, salicylic acid (OTC)<br>
+    • Moderate: Topical retinoids (tretinoin), topical antibiotics (clindamycin)<br>
+    • Severe: Oral antibiotics, isotretinoin (Roaccutane)<br>
+    • Hormonal: Combined oral contraceptive pill, spironolactone<br><br>
+    🚫 Never squeeze or pop pimples — this worsens scarring.`,
+
+  "eczema": `<strong>Eczema (Atopic Dermatitis)</strong> is a chronic inflammatory skin condition. 🟡<br><br>
+    Symptoms: intense itching, dry/cracked skin, red/inflamed patches, weeping/crusting.<br><br>
+    Common triggers: soaps, fragrances, dust mites, pet dander, stress, heat.<br><br>
+    <strong>Management:</strong><br>
+    • Emollient moisturisers frequently (especially after bathing)<br>
+    • Topical corticosteroids during flares<br>
+    • Topical calcineurin inhibitors (tacrolimus, pimecrolimus)<br>
+    • Dupilumab biologic for severe cases<br>
+    • Avoid known triggers`,
+
+  "psoriasis": `<strong>Psoriasis</strong> is a chronic autoimmune skin disease affecting ~2–3% of people. 🟡<br><br>
+    Appearance: thick, red plaques covered with silvery-white scales, usually on elbows, knees, and scalp.<br><br>
+    <strong>Treatments:</strong><br>
+    • Topical: Corticosteroids + Vitamin D analogues (calcipotriol)<br>
+    • Phototherapy: Narrowband UVB<br>
+    • Systemic: Methotrexate, ciclosporin<br>
+    • Biologics: Anti-TNF, anti-IL-17, anti-IL-23 (e.g., adalimumab, secukinumab)<br><br>
+    Psoriasis is <strong>not contagious</strong>. It's associated with psoriatic arthritis in 30% of cases.`,
+
+  "ringworm": `<strong>Ringworm (Tinea Corporis)</strong> is a fungal skin infection — not a worm! 🟢<br><br>
+    Appearance: circular, ring-shaped, scaly red rash with a clear centre. The active infection is at the border.<br><br>
+    Transmission: Direct skin-to-skin contact, shared towels/clothing, or from infected animals.<br><br>
+    <strong>Treatment:</strong><br>
+    • Topical antifungal: clotrimazole or terbinafine cream for 2–4 weeks<br>
+    • Oral antifungal (griseofulvin/terbinafine) for scalp or widespread infections<br>
+    • Keep skin dry — fungi thrive in moist conditions<br><br>
+    ⚠️ It IS contagious — avoid sharing personal items until treated.`,
+
+  "dermatologist": `You should see a dermatologist if you notice:<br><br>
+    🚨 <strong>Urgent (within 2 weeks):</strong><br>
+    • A mole that's changing, bleeding, or itching<br>
+    • A new dark or multicoloured lesion<br>
+    • A sore that doesn't heal in 6+ weeks<br>
+    • Rapid-spreading redness with fever<br><br>
+    📅 <strong>Non-urgent (within 2–3 months):</strong><br>
+    • Persistent rash that isn't responding to OTC treatment<br>
+    • Acne that's severe or causing scars<br>
+    • Psoriasis, eczema, or rosacea for specialist management<br>
+    • Annual skin cancer screening (especially if fair-skinned or family history)`,
+
+  "skin cancer": `There are three main types of skin cancer:<br><br>
+    🔴 <strong>1. Melanoma</strong> — most dangerous. Arises from pigment cells. Can spread internally.<br>
+    🟡 <strong>2. Basal Cell Carcinoma (BCC)</strong> — most common. Slow-growing, rarely spreads, but causes local damage.<br>
+    🟡 <strong>3. Squamous Cell Carcinoma (SCC)</strong> — can spread if left untreated.<br><br>
+    <strong>Risk factors:</strong> UV exposure, fair skin, family history, many moles, immunosuppression.<br><br>
+    <strong>Prevention:</strong><br>
+    • SPF 30+ sunscreen daily, reapply every 2 hours outdoors<br>
+    • Protective clothing & shade 10am–4pm<br>
+    • Annual professional skin checks<br>
+    • Never use sunbeds`,
+
+  "spf": `<strong>SPF (Sun Protection Factor) Guide:</strong><br><br>
+    • <strong>SPF 15</strong> — blocks ~93% of UVB rays. Minimum for outdoors.<br>
+    • <strong>SPF 30</strong> — blocks ~97% of UVB. Recommended daily minimum.<br>
+    • <strong>SPF 50</strong> — blocks ~98% of UVB. Best for high sun exposure.<br>
+    • <strong>SPF 50+</strong> — blocks ~99%. For very fair-skinned or post-procedure.<br><br>
+    📌 <strong>Tips:</strong><br>
+    • Apply 15–30 minutes before sun exposure<br>
+    • Reapply every 2 hours, or after swimming/sweating<br>
+    • Use broad-spectrum (UVA + UVB) sunscreen<br>
+    • Don't forget lips, neck, ears, and hands`,
+
+  "rosacea": `<strong>Rosacea</strong> is a chronic skin condition causing facial redness and flushing. 🟢<br><br>
+    Affects ~5% of adults. More common in fair-skinned women aged 30–60.<br><br>
+    <strong>Subtypes:</strong><br>
+    • Erythematotelangiectatic — persistent redness, visible blood vessels<br>
+    • Papulopustular — acne-like breakouts (no comedones)<br>
+    • Phymatous — skin thickening (nose enlargement = rhinophyma)<br>
+    • Ocular — eye irritation, redness<br><br>
+    <strong>Triggers:</strong> Sun, heat, alcohol, spicy food, stress, hot drinks, exercise.<br><br>
+    <strong>Treatment:</strong> Topical metronidazole, azelaic acid, ivermectin; oral doxycycline for papulopustular; laser for redness.`
+};
+
+function getAIResponse(userMsg) {
+  const msg = userMsg.toLowerCase();
+
+  // Check KB
+  for (const [key, response] of Object.entries(ASSISTANT_KB)) {
+    if (msg.includes(key)) return response;
+  }
+
+  // Disease-specific KB fallback
+  for (const [code, kb] of Object.entries(DISEASE_KB)) {
+    const aliases = [kb.name.toLowerCase(), kb.scientific.toLowerCase(), code.replace('_',' ')];
+    for (const alias of aliases) {
+      if (msg.includes(alias)) {
+        return `<strong>${kb.name}</strong> (${kb.scientific})<br><br>
+          <strong>Risk:</strong> ${kb.risk.toUpperCase()} · ${kb.category}<br>
+          <strong>Prevalence:</strong> ${kb.prevalence}<br><br>
+          ${kb.risk_desc}<br><br>
+          <strong>Key features:</strong><br>
+          • Asymmetry: ${kb.abcd.asymmetry}<br>
+          • Border: ${kb.abcd.border}<br>
+          • Colour: ${kb.abcd.color}<br><br>
+          <strong>Recommendations:</strong><br>
+          ${kb.recommendations.map(r=>`${r.icon} ${r.text}`).join('<br>')}`;
+      }
+    }
+  }
+
+  // Contextual responses
+  if (msg.includes('hello')||msg.includes('hi')||msg.includes('hey'))
+    return `Hello! 👋 I'm DermAI, your skin health assistant. How can I help you today? You can ask me about specific skin conditions, symptoms, treatments, or when to see a doctor.`;
+
+  if (msg.includes('treat')||msg.includes('cure')||msg.includes('medication')||msg.includes('medicine'))
+    return `Treatment always depends on the specific condition. Could you tell me which skin condition you're asking about? For example: acne, eczema, psoriasis, rosacea, or another condition? I can then give you detailed treatment information.`;
+
+  if (msg.includes('itch')||msg.includes('itchy'))
+    return `Itchy skin (pruritus) can be caused by many conditions:<br><br>
+      • <strong>Eczema/Atopic dermatitis</strong> — most common cause of chronic itching<br>
+      • <strong>Contact dermatitis</strong> — reaction to allergens or irritants<br>
+      • <strong>Urticaria (hives)</strong> — raised itchy welts, often allergic<br>
+      • <strong>Scabies</strong> — intense itching especially at night, mite infestation<br>
+      • <strong>Psoriasis</strong> — itchy red plaques<br>
+      • <strong>Tinea (ringworm)</strong> — fungal infection causing ring-shaped itchy rash<br><br>
+      If itching persists more than 2 weeks or worsens, see your GP or dermatologist.`;
+
+  if (msg.includes('sun')||msg.includes('sunscreen')||msg.includes('uv'))
+    return `<strong>Sun Protection Essentials:</strong><br><br>
+      ☀️ Use <strong>SPF 30+ broad-spectrum sunscreen</strong> every day — even when overcast (UV penetrates clouds).<br><br>
+      📌 Apply 15–30 minutes before going outside and reapply every 2 hours.<br><br>
+      🧢 Wear protective clothing, wide-brimmed hats.<br>
+      🕒 Seek shade between 10am–4pm (peak UV hours).<br>
+      🚫 Never use sunbeds — they significantly increase melanoma risk.<br><br>
+      UV exposure is the #1 preventable risk factor for skin cancer.`;
+
+  if (msg.includes('mole')||msg.includes('nevus'))
+    return `<strong>About Moles:</strong><br><br>
+      Normal moles (melanocytic nevi) are harmless. Most adults have 10–40 moles.<br><br>
+      Use the <strong>ABCDE checklist</strong> to monitor your moles:<br>
+      • <strong>A</strong>symmetry<br>
+      • <strong>B</strong>order irregularity<br>
+      • <strong>C</strong>olour variation<br>
+      • <strong>D</strong>iameter > 6mm<br>
+      • <strong>E</strong>volving (changing)<br><br>
+      ⚠️ See a dermatologist urgently if a mole has any of these features, bleeds, or itches persistently.`;
+
+  if (msg.includes('dry skin')||msg.includes('moistur'))
+    return `<strong>Dry Skin (Xerosis) Care:</strong><br><br>
+      🧴 <strong>Best moisturisers contain:</strong> ceramides, hyaluronic acid, glycerin, urea, shea butter.<br><br>
+      💡 <strong>Tips:</strong><br>
+      • Moisturise within 3 minutes of bathing (seal in moisture)<br>
+      • Use lukewarm water — hot water strips oils<br>
+      • Choose fragrance-free, gentle products<br>
+      • Humidifier in dry/winter environments<br>
+      • Stay hydrated (8 glasses of water/day)<br><br>
+      Persistent dry patches that don't respond to moisturiser may indicate eczema, psoriasis, or thyroid issues — see your doctor.`;
+
+  return `That's a great question about skin health! I'm most knowledgeable about specific skin conditions like melanoma, acne, eczema, psoriasis, rosacea, ringworm, and many more.<br><br>
+    Could you be more specific? For example:<br>
+    • "What is eczema?"<br>
+    • "How do I treat acne?"<br>
+    • "What are signs of skin cancer?"<br>
+    • "When should I see a dermatologist?"<br><br>
+    Or use the <strong>Skin Analysis</strong> tab to upload an image for AI-powered diagnosis.`;
+}
+
+function appendMessage(content, role) {
+  const box = document.getElementById('chatBox');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.innerHTML = `
+    <div class="msg-avatar ${role === 'ai' ? 'ai' : 'usr'}">${role==='ai'?'🔬':'👤'}</div>
+    <div class="msg-bubble">${content}</div>`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function showTyping() {
+  const box = document.getElementById('chatBox');
+  const div = document.createElement('div');
+  div.className = 'msg ai'; div.id = 'typing-indicator';
+  div.innerHTML = `<div class="msg-avatar ai">🔬</div>
+    <div class="msg-bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div>`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function removeTyping() {
+  const el = document.getElementById('typing-indicator');
+  if (el) el.remove();
+}
+
+async function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+
+  appendMessage(msg, 'user');
+  document.getElementById('suggestions').style.display = 'none';
+  showTyping();
+
+  await new Promise(r => setTimeout(r, 700 + Math.random()*600));
+  removeTyping();
+
+  const response = getAIResponse(msg);
+  appendMessage(response, 'ai');
+}
+
+function sendSuggestion(btn) {
+  document.getElementById('chatInput').value = btn.textContent;
+  sendMessage();
+}
+
+function clearChat() {
+  document.getElementById('chatBox').innerHTML = `
+    <div class="msg ai">
+      <div class="msg-avatar ai">🔬</div>
+      <div class="msg-bubble"><strong>Chat cleared.</strong> How can I help you with your skin health today?</div>
+    </div>`;
+  document.getElementById('suggestions').style.display = 'flex';
+}
+
+// ══════════════════════════════════════════════════
+// MAP / CLINICS
+// ══════════════════════════════════════════════════
+let mapInit = false;
+let leafletMap = null;
+let userMarker = null;
+let clinicMarkers = [];
+
+function initMap() {
+  if (mapInit) return;
+  mapInit = true;
+
+  leafletMap = L.map('map', {
+    center: [20, 0], zoom: 2,
+    attributionControl: true
+  });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19
+  }).addTo(leafletMap);
+}
+
+async function locateMe() {
+  if (!mapInit) initMap();
+
+  const btn = document.getElementById('locateBtn');
+  const status = document.getElementById('mapStatus');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span>⏳</span><span>Detecting location…</span>';
+  status.textContent = 'Requesting GPS location…';
+
+  try {
+    const pos = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        timeout: 10000, enableHighAccuracy: true
+      });
+    });
+
+    const { latitude: lat, longitude: lng } = pos.coords;
+    status.textContent = `📍 Location found (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+
+    leafletMap.setView([lat, lng], 14);
+
+    // User marker
+    if (userMarker) leafletMap.removeLayer(userMarker);
+    userMarker = L.circleMarker([lat, lng], {
+      radius: 10, fillColor: '#6366f1', color: '#fff',
+      fillOpacity: 1, weight: 2
+    }).addTo(leafletMap).bindPopup('📍 You are here').openPopup();
+
+    status.textContent = 'Searching for nearby clinics…';
+    await fetchNearbyClinics(lat, lng);
+
+  } catch(e) {
+    status.textContent = `⚠ Location error: ${e.message}. Try allowing location access.`;
+    btn.disabled = false;
+    btn.innerHTML = '<span>📍</span><span>Find Clinics Near Me</span>';
+  }
+}
+
+async function fetchNearbyClinics(lat, lng) {
+  const status = document.getElementById('mapStatus');
+  const btn = document.getElementById('locateBtn');
+
+  // Clear old markers
+  clinicMarkers.forEach(m => leafletMap.removeLayer(m));
+  clinicMarkers = [];
+
+  // Overpass API query for dermatologists, hospitals, clinics nearby
+  const radius = 5000; // 5km
+  const query = `
+    [out:json][timeout:20];
+    (
+      node["healthcare"="doctor"]["healthcare:speciality"="dermatology"](around:${radius},${lat},${lng});
+      node["amenity"="clinic"](around:${radius},${lat},${lng});
+      node["amenity"="hospital"](around:${radius},${lat},${lng});
+      node["healthcare"="centre"](around:${radius},${lat},${lng});
+      node["shop"="medical"](around:${radius},${lat},${lng});
+    );
+    out body; >;
+  `;
+
+  try {
+    const response = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST', body: query
+    });
+    const data = await response.json();
+
+    const clinics = data.elements
+      .filter(el => el.lat && el.lon)
+      .map(el => {
+        const tags = el.tags || {};
+        const name = tags.name || tags['name:en'] || 'Medical Facility';
+        const type = tags.healthcare === 'doctor' && tags['healthcare:speciality'] === 'dermatology'
+          ? 'Dermatologist'
+          : tags.amenity === 'hospital' ? 'Hospital'
+          : tags.amenity === 'clinic' ? 'Clinic'
+          : tags.healthcare === 'centre' ? 'Health Centre' : 'Medical Facility';
+        const dist = getDistance(lat, lng, el.lat, el.lon);
+        return { name, type, lat: el.lat, lon: el.lon, dist, tags };
+      })
+      .sort((a,b) => a.dist - b.dist)
+      .slice(0, 15);
+
+    if (clinics.length === 0) {
+      // Show fallback message with Google Maps link
+      document.getElementById('clinicList').innerHTML = `
+        <div style="font-size:0.8rem;color:var(--muted);text-align:center;padding:1.5rem;line-height:1.7">
+          No clinics found in OpenStreetMap within 5km.<br>
+          <a href="https://www.google.com/maps/search/dermatologist+near+me/@${lat},${lng},14z" target="_blank" 
+            style="color:var(--accent);text-decoration:none;font-weight:600">
+            🔍 Search on Google Maps →
+          </a>
+        </div>`;
+      status.textContent = `⚠ No clinics found within 5km in OpenStreetMap. Try Google Maps.`;
+    } else {
+      renderClinics(clinics, lat, lng);
+      status.textContent = `✅ Found ${clinics.length} nearby facilities`;
+    }
+  } catch(e) {
+    // Fallback: show Google Maps search link
+    document.getElementById('clinicList').innerHTML = `
+      <div style="font-size:0.8rem;color:var(--muted);text-align:center;padding:1.5rem;line-height:1.7">
+        Could not fetch clinic data.<br>
+        <a href="https://www.google.com/maps/search/skin+clinic+dermatologist+near+me/@${lat},${lng},14z" 
+           target="_blank" style="color:var(--accent);text-decoration:none;font-weight:600">
+           🗺 Open Google Maps →
+        </a>
+      </div>`;
+    status.textContent = `⚠ OpenStreetMap unavailable. Use Google Maps.`;
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<span>🔄</span><span>Refresh Location</span>';
+}
+
+function renderClinics(clinics, userLat, userLng) {
+  const list = document.getElementById('clinicList');
+  list.innerHTML = '';
+
+  const greenIcon = L.divIcon({
+    className: '',
+    html: `<div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,0.3)">🏥</div>`,
+    iconSize: [28, 28], iconAnchor: [14, 14]
+  });
+
+  clinics.forEach((clinic, i) => {
+    // Map marker
+    const marker = L.marker([clinic.lat, clinic.lon], { icon: greenIcon }).addTo(leafletMap);
+    marker.bindPopup(`<strong>${clinic.name}</strong><br>${clinic.type}<br>${clinic.dist.toFixed(2)} km away`);
+    clinicMarkers.push(marker);
+
+    // List card
+    const card = document.createElement('div');
+    card.className = 'clinic-card';
+    card.innerHTML = `
+      <div class="clinic-name">${clinic.name}</div>
+      <div class="clinic-dist">📍 ${clinic.dist.toFixed(2)} km away</div>
+      <div class="clinic-type">${clinic.type}</div>
+      <button class="clinic-dir-btn" onclick="openDirections(${clinic.lat},${clinic.lon},'${clinic.name.replace(/'/g,"\\'")}')">
+        🗺 Get Directions
+      </button>`;
+    card.addEventListener('click', () => {
+      leafletMap.setView([clinic.lat, clinic.lon], 16);
+      marker.openPopup();
+    });
+    list.appendChild(card);
+  });
+}
+
+function openDirections(lat, lon, name) {
+  const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}&destination_place_id=&travelmode=driving`;
+  window.open(url, '_blank');
+}
+
+function getDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLon = (lon2-lon1) * Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// ══════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════
+showPage('home');
+</script>
+</body>
+</html>

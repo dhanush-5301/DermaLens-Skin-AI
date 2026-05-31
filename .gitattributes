@@ -1,0 +1,34 @@
+# .gitattributes — Normalize line endings across platforms
+
+# Default: all text files use LF in the repo
+* text=auto eol=lf
+
+# Windows batch files stay CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Python / web / config files — LF
+*.py   text eol=lf
+*.html text eol=lf
+*.css  text eol=lf
+*.js   text eol=lf
+*.json text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.md   text eol=lf
+*.txt  text eol=lf
+*.env  text eol=lf
+*.sh   text eol=lf
+
+# Binary files — no line ending conversion
+*.jpg  binary
+*.jpeg binary
+*.png  binary
+*.gif  binary
+*.ico  binary
+*.pth  binary
+*.pt   binary
+*.onnx binary
+*.gz   binary
+*.zip  binary

@@ -1,0 +1,31 @@
+# DermaLens AI — Python Dependencies
+# Install: pip install -r requirements.txt
+
+# ── Web Framework ──────────────────────────────────────────────────
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+python-multipart==0.0.9
+
+# ── Deep Learning ─────────────────────────────────────────────────
+torch>=2.2.0
+torchvision>=0.17.0
+# For GPU: install torch with CUDA from https://pytorch.org/get-started
+
+# ── Image Processing ──────────────────────────────────────────────
+Pillow>=10.3.0
+numpy>=1.26.4
+
+# ── Anthropic Claude API ──────────────────────────────────────────
+anthropic>=0.28.0
+
+# ── Training (optional — only needed for train.py) ────────────────
+pandas>=2.2.0
+scikit-learn>=1.4.0
+matplotlib>=3.8.0
+seaborn>=0.13.0
+
+# ── Utilities ─────────────────────────────────────────────────────
+python-dotenv>=1.0.0
+pydantic>=2.7.0
+passlib[bcrypt]>=1.7.4
+python-jose[cryptography]>=3.3.0

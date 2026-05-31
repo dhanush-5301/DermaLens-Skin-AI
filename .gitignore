@@ -1,0 +1,85 @@
+# ── Python ─────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Virtual Environments ────────────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+.env.local
+
+# ── Environment Variables (keep .env.example, ignore .env) ─────────
+.env
+!.env.example
+
+# ── Model Weights (large binary files — host separately) ────────────
+models/*.pth
+models/*.pt
+models/*.onnx
+models/*.tflite
+# Keep placeholder and outputs
+!models/.gitkeep
+models/confusion_matrix.png
+models/training_curves.png
+models/training_history.json
+
+# ── Dataset (large — not committed to git) ──────────────────────────────────────────────────────
+# HAM10000 images and metadata CSV are too large for GitHub (CSV ~557MB, images ~3GB)
+# Download from: https://www.kaggle.com/datasets/kmader/skin-lesion-analysis-toward-melanoma-detection
+data/HAM10000/HAM10000_images_part1/
+data/HAM10000/HAM10000_images_part2/
+data/HAM10000/images/
+data/HAM10000/HAM10000_metadata.csv
+data/HAM10000/*.csv
+data/HAM10000/*.jpg
+data/HAM10000/*.jpeg
+data/HAM10000/*.png
+!data/.gitkeep
+
+# ── Uploads (runtime user data) ─────────────────────────────────────
+uploads/
+!uploads/.gitkeep
+
+# ── Logs ────────────────────────────────────────────────────────────
+logs/
+!logs/.gitkeep
+*.log
+
+# ── Archives ────────────────────────────────────────────────────────
+*.tar.gz
+*.zip
+*.rar
+*.7z
+
+# ── OS / Editor ─────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── Jupyter ─────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Docker ──────────────────────────────────────────────────────────
+.dockerignore
+
+# ── Misc ────────────────────────────────────────────────────────────
+*.tmp
+*.bak
+dummy.jpg
